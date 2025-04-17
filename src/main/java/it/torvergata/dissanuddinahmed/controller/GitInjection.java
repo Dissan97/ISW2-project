@@ -1,9 +1,8 @@
 package it.torvergata.dissanuddinahmed.controller;
 
-import it.torvergata.dissanuddinahmed.model.Commit;
-import it.torvergata.dissanuddinahmed.model.JavaClass;
-import it.torvergata.dissanuddinahmed.model.Release;
-import it.torvergata.dissanuddinahmed.model.Ticket;
+import it.torvergata.dissanuddinahmed.model.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ListBranchCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -36,7 +35,10 @@ public class GitInjection {
     private static final String TEMP = ".temp" + File.separator;
     private static final String GIT = File.separator+ ".git";
 
+    @Getter
+    @Setter
     private List<Ticket> tickets;
+    @Getter
     private final List<Release> releases;
     protected final Git localGithub;
     private final Repository repository;
@@ -85,7 +87,7 @@ public class GitInjection {
             LocalDate lowerBoundDate = LocalDate.parse(formatter.format(new Date(0)));
 
             for(Release release: this.releases) {
-                LocalDate dateOfRelease = release.releaseDate();
+                LocalDate dateOfRelease = release.getReleaseDate();
                 if (commitDate.isAfter(lowerBoundDate) && !commitDate.isAfter(dateOfRelease)) {
                     Commit newCommit = new Commit(revCommit, release);
                     this.commits.add(newCommit);
@@ -100,14 +102,6 @@ public class GitInjection {
             release.setId(++i);
         }
         this.commits.sort(Comparator.comparing(o -> o.getRevCommit().getCommitterIdent().getWhen()));
-    }
-
-    public List<Release> getReleases() {
-        return releases;
-    }
-
-    public void setTickets(List<Ticket> fixedTickets) {
-        this.tickets = fixedTickets;
     }
 
     public void preprocessCommitsWithIssue() {
@@ -154,11 +148,11 @@ public class GitInjection {
         for (int i = 0; i < this.releases.size(); i++) {
             List<Commit> tempCommits = new ArrayList<>(this.commits);
             int finalI = i;
-            tempCommits.removeIf(commit -> (commit.getRelease().id() != finalI));
+            tempCommits.removeIf(commit -> (commit.getRelease().getId() != finalI));
             if (tempCommits.isEmpty()) {
                 continue;
             }
-            latestCommits.add(tempCommits.get(tempCommits.size() - 1));
+            latestCommits.add(tempCommits.getLast());
         }
 
         latestCommits.sort(Comparator.comparing(commit -> commit.getRevCommit().getCommitterIdent().getWhen()));
@@ -171,6 +165,7 @@ public class GitInjection {
         }
 
         this.fillClassesInfo();
+
         this.checkUpdateInClassCommitted();
         this.javaClasses.sort(Comparator.comparing(JavaClass::getName));
     }
@@ -197,8 +192,9 @@ public class GitInjection {
     }
     public void fillClassesInfo(List <Ticket> theTickets, List<JavaClass> theClasses) throws IOException {
         for(JavaClass javaClass: theClasses) {
-            javaClass.getMetrics().setBuggyness(false);
+            javaClass.getMetrics().setBug(false);
         }
+
         for(Ticket ticket: theTickets) {
             List<Commit> commitsContainingTicket = ticket.getCommitList();
             Release injectedVersion = ticket.getInjectedVersion();
@@ -212,6 +208,7 @@ public class GitInjection {
                     Release releaseOfCommit = commit.getRelease();
                     for (String modifiedClass : modifiedClassesNames) {
                         checkForBuggyClass(modifiedClass, injectedVersion, releaseOfCommit);
+
                     }
                 }
             }
@@ -222,13 +219,15 @@ public class GitInjection {
         for(JavaClass javaClass: this.javaClasses) {
             if(
                     (javaClass.getName().equals(modifiedClass)) &&
-                    (javaClass.getRelease().id() < fixedVersion.id()) &&
-                    (javaClass.getRelease().id() >= injectedVersion.id())
+                    (javaClass.getRelease().getId() < fixedVersion.getId()) &&
+                    (javaClass.getRelease().getId() >= injectedVersion.getId())
             ){
-                javaClass.getMetrics().setBuggyness(true);
+                javaClass.getMetrics().setBug(true);
             }
+
         }
     }
+
 
     private List<String> getTouchedClassesNames(RevCommit commit) throws IOException {
         List<String> touchedClassesNames = new ArrayList<>();
@@ -304,7 +303,7 @@ public class GitInjection {
         for (Ticket ticket : this.tickets) {
             List<String> ids = new ArrayList<>();
             for (Release release : ticket.getAffectedVersions()) {
-                ids.add(release.releaseName());
+                ids.add(release.getReleaseName());
             }
             Map<String, String> inner = new LinkedHashMap<>();
             inner.put("injectedVersion", ticket.getInjectedVersion().toString());
@@ -330,7 +329,7 @@ public class GitInjection {
             if (ticket != null) {
                 inner.put("ticketKey", commit.getTicket().getTicketKey());
             }
-            inner.put("release", release.releaseName());
+            inner.put("release", release.getReleaseName());
             inner.put("creationDate",
                     String.valueOf(LocalDate.parse((new SimpleDateFormat(GitInjection.LOCAL_DATE_FORMAT)
                             .format(revCommit.getCommitterIdent().getWhen())
@@ -349,7 +348,4 @@ public class GitInjection {
         return summaryMap;
     }
 
-    public List<Ticket> getTickets() {
-        return this.tickets;
-    }
 }

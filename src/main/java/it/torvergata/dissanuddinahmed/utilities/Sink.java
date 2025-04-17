@@ -196,7 +196,7 @@ public class Sink {
                                             List<JavaClass> javaClasses, boolean arffFile) throws IOException {
         for (Release release : releases) {
             for (JavaClass javaClass : javaClasses) {
-                if (javaClass.getRelease().id() == release.id()) {
+                if (javaClass.getRelease().getId() == release.getId()) {
                     doAppendData(fileWriter, release, javaClass, arffFile);
                 }
             }
@@ -205,8 +205,8 @@ public class Sink {
 
     private static void doAppendData(FileWriter fileWriter, Release release, JavaClass javaClass,
                                      boolean isArff) throws IOException {
-        String releaseID = Integer.toString(release.id());
-        String isClassBugged = javaClass.getMetrics().getBuggyness() ? "YES" : "NO";
+        String releaseID = Integer.toString(release.getId());
+        String isClassBugged = javaClass.getMetrics().isBug() ? "YES" : "NO";
         String sizeOfClass = String.valueOf(javaClass.getMetrics().getSize());
         String addedLOC = String.valueOf(javaClass.getMetrics().getAddedLOCMetrics().getVal());
         String avgAddedLOC = String.valueOf(javaClass.getMetrics().getAddedLOCMetrics().getAvgVal());
@@ -254,7 +254,7 @@ public class Sink {
                     .append(String.valueOf(classifierResult.getWalkForwardIteration())).append(",")
                     .append(String.valueOf(classifierResult.getTrainingPercent())).append(",")
                     .append(classifierResult.getClassifierName()).append(",");
-            if(classifierResult.hasFeatureSelection()){
+            if(classifierResult.isFeatureSelection()){
                 fileWriter.append(classifierResult.getCustomClassifier().getFeatureSelectionFilterName()).append(",");
             }else {
                 fileWriter.append("None").append(",");
@@ -264,7 +264,7 @@ public class Sink {
             }else {
                 fileWriter.append("None").append(",");
             }
-            if (classifierResult.hasCostSensitive()){
+            if (classifierResult.isCostSensitive()){
                 fileWriter.append("SensitiveLearning").append(",");
             }else {
                 fileWriter.append("None").append(",");

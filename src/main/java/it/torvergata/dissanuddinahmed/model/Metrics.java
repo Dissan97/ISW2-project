@@ -1,19 +1,28 @@
 package it.torvergata.dissanuddinahmed.model;
 
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
 public class Metrics {
     private final LOCMetrics removedLOCMetrics;
     private final LOCMetrics churnMetrics;
     private final LOCMetrics addedLOCMetrics;
 
     private final LOCMetrics touchedLOCMetrics;
-    private boolean bugged;
+    @Setter
+    private boolean bug;
+    @Setter
     private int size;
+    @Setter
     private int numberOfRevisions;
+    @Setter
     private int numberOfDefectFixes;
+    @Setter
     private int numberOfAuthors;
 
     public Metrics() {
-        bugged = false;
+        bug = false;
         size = 0;
         numberOfRevisions = 0;
         numberOfDefectFixes = 0;
@@ -24,37 +33,6 @@ public class Metrics {
         touchedLOCMetrics = new LOCMetrics();
     }
 
-    public boolean getBuggyness() {
-        return bugged;
-    }
-
-    public void setBuggyness(boolean bugged) {
-        this.bugged = bugged;
-    }
-
-    public void setSize(int size) {
-        this.size = size;
-    }
-
-    public int getSize() {
-        return size;
-    }
-
-    public LOCMetrics getRemovedLOCMetrics() {
-        return removedLOCMetrics;
-    }
-
-    public LOCMetrics getChurnMetrics() {
-        return churnMetrics;
-    }
-
-    public LOCMetrics getAddedLOCMetrics() {
-        return addedLOCMetrics;
-    }
-
-    public LOCMetrics getTouchedLOCMetrics() {
-        return touchedLOCMetrics;
-    }
 
     public void setAddedLOCMetrics(int addedLOC, int maxAddedLOC, double avgAddedLOC) {
         this.addedLOCMetrics.setVal(addedLOC);
@@ -80,28 +58,6 @@ public class Metrics {
         this.touchedLOCMetrics.setAvgVal(avgTouchedLOC);
 
     }
-    public void setNumberOfRevisions(int numberOfRevisions) {
-        this.numberOfRevisions = numberOfRevisions;
-    }
 
 
-    public int getNumberOfRevisions() {
-        return numberOfRevisions;
-    }
-
-    public void setNumberOfDefectFixes(int numberOfDefectFixes) {
-        this.numberOfDefectFixes = numberOfDefectFixes;
-    }
-
-    public int getNumberOfDefectFixes() {
-        return numberOfDefectFixes;
-    }
-
-    public void setNumberOfAuthors(int numberOfAuthors) {
-        this.numberOfAuthors = numberOfAuthors;
-    }
-
-    public int getNumberOfAuthors() {
-        return numberOfAuthors;
-    }
 }

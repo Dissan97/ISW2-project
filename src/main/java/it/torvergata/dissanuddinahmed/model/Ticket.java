@@ -1,17 +1,23 @@
 package it.torvergata.dissanuddinahmed.model;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+@Getter
 public class Ticket {
     private final String ticketKey;
 
     private final LocalDate creationDate;
     private final LocalDate resolutionDate;
+    @Setter
     private Release injectedVersion;
     private final Release openingVersion;
     private final Release fixedVersion;
+    @Setter
     private List<Release> affectedVersions;
     private final List<Commit> commitList;
 
@@ -22,44 +28,12 @@ public class Ticket {
         if(affectedVersions.isEmpty()){
             injectedVersion = null;
         }else{
-            injectedVersion = affectedVersions.get(0);
+            injectedVersion = affectedVersions.getFirst();
         }
         this.openingVersion = openingVersion;
         this.fixedVersion = fixedVersion;
         this.affectedVersions = affectedVersions;
         commitList = new ArrayList<>();
-    }
-
-    public Release getInjectedVersion() {
-        return injectedVersion;
-    }
-
-    public void setInjectedVersion(Release injectedVersion) {
-        this.injectedVersion = injectedVersion;
-    }
-
-    public Release getOpeningVersion() {
-        return openingVersion;
-    }
-
-    public Release getFixedVersion() {
-        return fixedVersion;
-    }
-
-    public List<Release> getAffectedVersions() {
-        return affectedVersions;
-    }
-
-    public void setAffectedVersions(List<Release> affectedVersions) {
-        this.affectedVersions = affectedVersions;
-    }
-
-    public String getTicketKey() {
-        return ticketKey;
-    }
-
-    public LocalDate getCreationDate() {
-        return creationDate;
     }
 
     public void addCommit(Commit newCommit) {
@@ -71,12 +45,5 @@ public class Ticket {
         return !this.getAffectedVersions().isEmpty();
     }
 
-    public List<Commit> getCommitList(){
-        return commitList;
-    }
-
-    public LocalDate getResolutionDate() {
-        return resolutionDate;
-    }
 }
 

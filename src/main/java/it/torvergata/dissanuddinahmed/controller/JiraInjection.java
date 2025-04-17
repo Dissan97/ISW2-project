@@ -4,6 +4,7 @@ import it.torvergata.dissanuddinahmed.model.Release;
 import it.torvergata.dissanuddinahmed.model.Ticket;
 import it.torvergata.dissanuddinahmed.utilities.Sink;
 import it.torvergata.dissanuddinahmed.utilities.WebJsonReader;
+import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.json.JSONArray;
@@ -17,12 +18,14 @@ import java.util.*;
 
 
 public class JiraInjection {
-
     private static final String  RELEASE_DATE = "releaseDate";
     private final String projName;
+    @Getter
     private List<Release> releases = null;
     private List<Release> affectedReleases = null;
+    @Getter
     private List<Ticket> ticketsWithIssues = null;
+    @Getter
     private List<Ticket> fixedTickets = null;
 
     public JiraInjection(String projectName) {
@@ -45,11 +48,13 @@ public class JiraInjection {
                 releases.add(new Release(releaseName, LocalDate.parse(releaseDate)));
             }
         }
-        releases.sort(Comparator.comparing(Release::releaseDate));
+
+        releases.sort(Comparator.comparing(Release::getReleaseDate));
         i = 0;
         for (Release release : releases) {
             release.setId(++i);
         }
+
     }
 
     public void injectTickets() throws IOException, URISyntaxException {
@@ -102,12 +107,12 @@ public class JiraInjection {
                 if(!this.affectedReleases.isEmpty()
                         && openingVersion!=null
                         && fixedVersion!=null
-                        && (!this.affectedReleases.get(0).releaseDate().isBefore(openingVersion.releaseDate())
-                        || openingVersion.releaseDate().isAfter(fixedVersion.releaseDate()))){
+                        && (!this.affectedReleases.getFirst().getReleaseDate().isBefore(openingVersion.getReleaseDate())
+                        || openingVersion.getReleaseDate().isAfter(fixedVersion.getReleaseDate()))){
                     continue;
                 }
-                if(openingVersion != null && fixedVersion != null && openingVersion.id() !=
-                        this.releases.get(0).id()){
+                if(openingVersion != null && fixedVersion != null && openingVersion.getId() !=
+                        this.releases.getFirst().getId()){
                     this.ticketsWithIssues.add(new Ticket(key, creationDate, resolutionDate, openingVersion,
                             fixedVersion, this.affectedReleases));
                 }
@@ -151,34 +156,34 @@ public class JiraInjection {
         List<Release> affectedVersionsList = new ArrayList<>();
         int injectedVersionId;
         //IV = max(1; FV-(FV-OV)*P)
-        if(ticket.getFixedVersion().id() == ticket.getOpeningVersion().id()){
-            injectedVersionId = Math.max(1, (int) (ticket.getFixedVersion().id()-proportion));
+        if(ticket.getFixedVersion().getId() == ticket.getOpeningVersion().getId()){
+            injectedVersionId = Math.max(1, (int) (ticket.getFixedVersion().getId()-proportion));
         }else{
-            injectedVersionId = Math.max(1, (int) (ticket.getFixedVersion().id()
-                    -((ticket.getFixedVersion().id()-ticket.getOpeningVersion().id())*proportion)));
+            injectedVersionId = Math.max(1, (int) (ticket.getFixedVersion().getId()
+                    -((ticket.getFixedVersion().getId()-ticket.getOpeningVersion().getId())*proportion)));
         }
         for (Release release : this.releases){
-            if(release.id() == injectedVersionId){
-                affectedVersionsList.add(new Release(release.id(), release.releaseName(), release.releaseDate()));
+            if(release.getId() == injectedVersionId){
+                affectedVersionsList.add(new Release(release.getId(), release.getReleaseName(), release.getReleaseDate()));
                 break;
             }
         }
-        affectedVersionsList.sort(Comparator.comparing(Release::releaseDate));
+        affectedVersionsList.sort(Comparator.comparing(Release::getReleaseDate));
         ticket.setAffectedVersions(affectedVersionsList);
-        ticket.setInjectedVersion(affectedVersionsList.get(0));
+        ticket.setInjectedVersion(affectedVersionsList.getFirst());
     }
     private void adjustAffectedVersions(@NotNull Ticket ticket) {
         List<Release> completeAffectedVersionsList = new ArrayList<>();
-        for(int i = ticket.getInjectedVersion().id(); i < ticket.getFixedVersion().id(); i++){
+        for(int i = ticket.getInjectedVersion().getId(); i < ticket.getFixedVersion().getId(); i++){
             for(Release release : this.releases){
-                if(release.id() == i){
-                    completeAffectedVersionsList.add(new Release(release.id(),
-                            release.releaseName(), release.releaseDate()));
+                if(release.getId() == i){
+                    completeAffectedVersionsList.add(new Release(release.getId(),
+                            release.getReleaseName(), release.getReleaseDate()));
                     break;
                 }
             }
         }
-        completeAffectedVersionsList.sort(Comparator.comparing(Release::releaseDate));
+        completeAffectedVersionsList.sort(Comparator.comparing(Release::getReleaseDate));
         ticket.setAffectedVersions(completeAffectedVersionsList);
     }
 
@@ -187,32 +192,24 @@ public class JiraInjection {
         for (int i = 0; i < affectedVersionsArray.length(); i++) {
             String affectedVersionName = affectedVersionsArray.getJSONObject(i).get("name").toString();
             for (Release release : this.releases) {
-                if (Objects.equals(affectedVersionName, release.releaseName())) {
+                if (Objects.equals(affectedVersionName, release.getReleaseName())) {
                     this.affectedReleases.add(release);
                     break;
                 }
             }
         }
-        this.affectedReleases.sort(Comparator.comparing(Release::releaseDate));
+        this.affectedReleases.sort(Comparator.comparing(Release::getReleaseDate));
 
     }
 
     private @Nullable Release getReleaseAfterOrEqualDate(LocalDate specificDate, @NotNull List<Release> releasesList) {
-        releasesList.sort(Comparator.comparing(Release::releaseDate));
+        releasesList.sort(Comparator.comparing(Release::getReleaseDate));
         for (Release release : releasesList) {
-            if (!release.releaseDate().isBefore(specificDate)) {
+            if (!release.getReleaseDate().isBefore(specificDate)) {
                 return release;
             }
         }
         return null;
-    }
-
-    public List<Release> getReleases() {
-        return this.releases;
-    }
-
-    public List<Ticket> getTicketsWithIssues() {
-        return this.ticketsWithIssues;
     }
 
     public List<Ticket> getTicketsWithAffectedVersion (){
@@ -226,22 +223,20 @@ public class JiraInjection {
         return affectedVersions;
     }
 
-    public List<Ticket> getFixedTickets() {
-        return this.fixedTickets;
-    }
-
     public Map<String, String> getMapReleases() {
         Map<String, String> retMap = new HashMap<>();
-        this.releases.sort(Comparator.comparing(Release::releaseDate));
+        this.releases.sort(Comparator.comparing(Release::getReleaseDate));
         final String name = "name";
         final String commits = "commits";
         for (Release release : this.releases) {
             Map<String, String> inner = new LinkedHashMap<>();
-            inner.put(name, release.releaseName());
-            inner.put(RELEASE_DATE, release.releaseDate().toString());
+            inner.put(name, release.getReleaseName());
+            inner.put(RELEASE_DATE, release.getReleaseDate().toString());
             inner.put(commits, String.valueOf(release.getCommitList().size()));
-            retMap.put(String.valueOf(release.id()), inner.toString());
+            retMap.put(String.valueOf(release.getId()), inner.toString());
         }
         return retMap;
     }
+
+
 }

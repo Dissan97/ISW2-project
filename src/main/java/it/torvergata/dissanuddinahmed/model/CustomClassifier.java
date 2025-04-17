@@ -1,13 +1,15 @@
 package it.torvergata.dissanuddinahmed.model;
 
+import lombok.Getter;
 import weka.classifiers.Classifier;
 
+@Getter
 public class CustomClassifier {
     private final Classifier classifier;
     private final String featureSelectionFilterName;
     private final String samplingFilterName;
     private final String classifierName;
-    private final boolean isCostSensitive;
+    private final boolean costSensitive;
 
     public CustomClassifier(Classifier classifier, String classifierName, String featureSelectionFilterName,
                             String bestFirstDirection, String samplingFilterName, boolean isCostSensitive) {
@@ -23,28 +25,10 @@ public class CustomClassifier {
         } else {
             this.featureSelectionFilterName = featureSelectionFilterName;
         }
-        this.isCostSensitive = isCostSensitive;
+        this.costSensitive = isCostSensitive;
         this.classifierName = classifierName;
     }
 
 
-    public Classifier getClassifier() {
-        return classifier;
-    }
 
-    public String getClassifierName() {
-        return classifierName;
-    }
-
-    public String getFeatureSelectionFilterName() {
-        return featureSelectionFilterName;
-    }
-
-    public String getSamplingFilterName() {
-        return samplingFilterName;
-    }
-
-    public boolean isCostSensitive() {
-        return isCostSensitive;
-    }
 }

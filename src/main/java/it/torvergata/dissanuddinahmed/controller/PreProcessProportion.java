@@ -57,14 +57,14 @@ public class PreProcessProportion {
         double totalProportion = 0.0;
         double denominator;
         for (Ticket correctTicket : tickets) {
-            if (correctTicket.getFixedVersion().id() != correctTicket.getOpeningVersion().id()) {
-                denominator = ((double) correctTicket.getFixedVersion().id() -
-                        (double) correctTicket.getOpeningVersion().id());
+            if (correctTicket.getFixedVersion().getId() != correctTicket.getOpeningVersion().getId()) {
+                denominator = ((double) correctTicket.getFixedVersion().getId() -
+                        (double) correctTicket.getOpeningVersion().getId());
             } else {
                 denominator = 1;
             }
-            double propForTicket = ((double) correctTicket.getFixedVersion().id() -
-                    (double) correctTicket.getInjectedVersion().id()) / denominator;
+            double propForTicket = ((double) correctTicket.getFixedVersion().getId() -
+                    (double) correctTicket.getInjectedVersion().getId()) / denominator;
             totalProportion += propForTicket;
         }
         return totalProportion;
@@ -74,7 +74,7 @@ public class PreProcessProportion {
         if (!compute && newEntry) {
 
             JSONObject entry = new JSONObject();
-            if (ticket.getFixedVersion().id() != ticket.getOpeningVersion().id()) {
+            if (ticket.getFixedVersion().getId() != ticket.getOpeningVersion().getId()) {
                 entry.put(AVERAGE_PROPORTION, MESSAGE_PROPORTION);
 
             } else {

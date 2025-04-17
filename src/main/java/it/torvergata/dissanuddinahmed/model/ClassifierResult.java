@@ -1,32 +1,52 @@
 package it.torvergata.dissanuddinahmed.model;
 
+import lombok.Getter;
+import lombok.Setter;
 import weka.classifiers.Evaluation;
 
 public class ClassifierResult {
 
+
+    @Getter
     private final int walkForwardIteration;
+    @Getter
     private final String classifierName;
-    private final boolean hasFeatureSelection;
+    @Getter
+    private final boolean featureSelection;
     private final boolean hasSampling;
+    @Getter
     private final CustomClassifier customClassifier;
-    private final boolean hasCostSensitive;
+    @Getter
+    private final boolean costSensitive;
+    @Getter
+    @Setter
     private double trainingPercent;
+    @Getter
+    @Setter
     private double precision;
+    @Getter
+    @Setter
     private double recall;
+    @Getter
     private final double areaUnderROC;
+    @Getter
     private final double kappa;
+    @Getter
     private final double truePositives;
+    @Getter
     private final double falsePositives;
+    @Getter
     private final double trueNegatives;
+    @Getter
     private final double falseNegatives;
 
     public ClassifierResult(int walkForwardIteration, CustomClassifier customClassifier, Evaluation evaluation) {
         this.walkForwardIteration = walkForwardIteration;
         this.customClassifier = customClassifier;
         this.classifierName = customClassifier.getClassifierName();
-        this.hasFeatureSelection = (!customClassifier.getFeatureSelectionFilterName().equals("NoSelection"));
+        this.featureSelection = (!customClassifier.getFeatureSelectionFilterName().equals("NoSelection"));
         this.hasSampling = (!customClassifier.getSamplingFilterName().equals("NoSampling"));
-        this.hasCostSensitive = customClassifier.isCostSensitive();
+        this.costSensitive = customClassifier.isCostSensitive();
 
         trainingPercent = 0.0;
         truePositives = evaluation.numTruePositives(0);
@@ -47,75 +67,8 @@ public class ClassifierResult {
         kappa = evaluation.kappa();
     }
 
-    public void setTrainingPercent(double trainingPercent) {
-        this.trainingPercent = trainingPercent;
-    }
-
-    public double getTrainingPercent() {
-        return trainingPercent;
-    }
-
-    public void setPrecision(double precision) {
-        this.precision = precision;
-    }
-
-    public double getPrecision() {
-        return precision;
-    }
-
-    public void setRecall(double recall) {
-        this.recall = recall;
-    }
-
-    public double getRecall() {
-        return recall;
-    }
-
-    public double getAreaUnderROC() {
-        return areaUnderROC;
-    }
-
-    public double getKappa() {
-        return kappa;
-    }
-
-    public double getTruePositives() {
-        return truePositives;
-    }
-
-    public double getFalsePositives() {
-        return falsePositives;
-    }
-
-    public double getTrueNegatives() {
-        return trueNegatives;
-    }
-
-    public double getFalseNegatives() {
-        return falseNegatives;
-    }
-
-    public int getWalkForwardIteration() {
-        return walkForwardIteration;
-    }
-
-    public String getClassifierName() {
-        return classifierName;
-    }
-
-    public boolean hasFeatureSelection() {
-        return hasFeatureSelection;
-    }
-
     public boolean hasSampling() {
         return hasSampling;
     }
 
-    public CustomClassifier getCustomClassifier() {
-        return customClassifier;
-    }
-
-    public boolean hasCostSensitive() {
-        return hasCostSensitive;
-    }
 }

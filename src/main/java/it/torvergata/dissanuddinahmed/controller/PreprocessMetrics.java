@@ -28,7 +28,7 @@ public class PreprocessMetrics {
 
     private void computeSize() {
         this.gitCtrl.getJavaClasses().parallelStream().forEach(javaClass -> {
-            String[] lines = javaClass.getClassContent().split("\r\n|\r|\n");
+            String[] lines = javaClass.getClassBody().split("\r\n|\r|\n");
             javaClass.getMetrics().setSize(lines.length);
         });
     }
@@ -138,24 +138,24 @@ public class PreprocessMetrics {
         List<Release> releases = this.gitCtrl.getReleases();
         List<Ticket> tickets = this.gitCtrl.getTickets();
         List<JavaClass> classes = this.gitCtrl.getJavaClasses();
-        int lastReleaseForDatasetId = releases.get((releases.size() / 2) - 1).id();
+        int lastReleaseForDatasetId = releases.get((releases.size() / 2) - 1).getId();
 
         for (int i = 1; i <= lastReleaseForDatasetId; i++) {
             int finalI = i;
 
             List<Release> firstIReleases = releases.stream()
-                    .filter(release -> release.id() <= finalI)
+                    .filter(release -> release.getId() <= finalI)
                     .toList();
             try {
-                int lastReleaseId = firstIReleases.getLast().id();
+                int lastReleaseId = firstIReleases.getLast().getId();
 
 
                 List<Ticket> firstITickets = tickets.stream()
-                        .filter(ticket -> ticket.getFixedVersion().id() <= lastReleaseId)
+                        .filter(ticket -> ticket.getFixedVersion().getId() <= lastReleaseId)
                         .toList();
 
                 List<JavaClass> firstIProjectClassesTraining = classes.stream()
-                        .filter(javaClass -> javaClass.getRelease().id() <= lastReleaseId)
+                        .filter(javaClass -> javaClass.getRelease().getId() <= lastReleaseId)
                         .toList();
                 gitCtrl.fillClassesInfo(firstITickets, firstIProjectClassesTraining);
                 final String filename = projectName + '_' + finalI;
@@ -167,14 +167,14 @@ public class PreprocessMetrics {
 
                 List<Release> releasesForTestSet = new ArrayList<>();
                 for (Release release : releases) {
-                    if (release.id() == (firstIReleases.getLast().id() + 1)) {
+                    if (release.getId() == (firstIReleases.getLast().getId() + 1)) {
                         releasesForTestSet.add(release);
                     }
                 }
 
                 List<JavaClass> firstIProjectClassesTesting = classes.stream()
-                        .filter(javaClass -> javaClass.getRelease().id() == releasesForTestSet.getLast(
-                        ).id())
+                        .filter(javaClass -> javaClass.getRelease().getId() == releasesForTestSet.getLast(
+                        ).getId())
                         .toList();
 
                 Sink.serializeInjectionToCsv(projectName, filename,
