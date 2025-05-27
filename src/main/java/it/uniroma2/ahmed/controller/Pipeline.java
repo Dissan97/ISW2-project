@@ -1,15 +1,12 @@
-package it.torvergata.dissanuddinahmed.controller;
+package it.uniroma2.ahmed.controller;
 
-import it.torvergata.dissanuddinahmed.logging.SeLogger;
-import it.torvergata.dissanuddinahmed.model.Release;
-import it.torvergata.dissanuddinahmed.utilities.Sink;
-import org.eclipse.jgit.api.errors.GitAPIException;
+import it.uniroma2.ahmed.logging.SeLogger;
+import it.uniroma2.ahmed.model.Release;
+import it.uniroma2.ahmed.utilities.Sink;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.Logger;
@@ -92,16 +89,16 @@ public class Pipeline implements Runnable{
             info = this.threadIdentity + "java class injection complete took: " + getTimeInSeconds(start, end)
                     + seconds;
             logger.info(info);
-
             gitInjection.closeRepo();
 
             // Preprocessing Project
             start = System.nanoTime();
             info = this.threadIdentity + "start preprocessing project";
             logger.info(info);
+            // now must start preprocessing also Method Metrics
 
             PreprocessMetrics preprocessMetrics = new PreprocessMetrics(gitInjection);
-            preprocessMetrics.startPreprocessing();
+            preprocessMetrics.start();
             storeCurrentData(jiraInjection, gitInjection);
             end = System.nanoTime();
             info = this.threadIdentity + "preprocessing project complete took: " + getTimeInSeconds(start, end) +
@@ -143,13 +140,14 @@ public class Pipeline implements Runnable{
                     seconds;
             logger.info(info);
 
-        } catch (IOException | URISyntaxException | GitAPIException e) {
-            logger.severe(e.getMessage());
+        } catch (Exception e) {
+            logger.severe("error: " + e.getMessage());
         } finally {
             long overallEnd = System.nanoTime();
             info = this.threadIdentity + "total processing took: " + getTimeInSeconds(overallStart, overallEnd) +
                     seconds;
             logger.info(info);
+
         }
     }
 
@@ -181,5 +179,6 @@ public class Pipeline implements Runnable{
                 SeLogger.SECONDS;
         logger.info(finalMessage);
         this.latch.countDown();
+
     }
 }

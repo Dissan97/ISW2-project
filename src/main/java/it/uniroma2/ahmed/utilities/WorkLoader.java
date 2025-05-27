@@ -1,6 +1,6 @@
-package it.torvergata.dissanuddinahmed.utilities;
+package it.uniroma2.ahmed.utilities;
 
-import it.torvergata.dissanuddinahmed.logging.SeLogger;
+import it.uniroma2.ahmed.logging.SeLogger;
 import org.jetbrains.annotations.Nullable;
 import org.json.JSONObject;
 

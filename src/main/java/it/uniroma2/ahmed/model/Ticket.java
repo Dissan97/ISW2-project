@@ -1,7 +1,8 @@
-package it.torvergata.dissanuddinahmed.model;
+package it.uniroma2.ahmed.model;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -21,7 +22,8 @@ public class Ticket {
     private List<Release> affectedVersions;
     private final List<Commit> commitList;
 
-    public Ticket(String ticketKey, LocalDate creationDate, LocalDate resolutionDate, Release openingVersion, Release fixedVersion, List<Release> affectedVersions) {
+    public Ticket(String ticketKey, LocalDate creationDate, LocalDate resolutionDate, Release openingVersion,
+                  Release fixedVersion, @NotNull List<Release> affectedVersions) {
         this.ticketKey = ticketKey;
         this.creationDate = creationDate;
         this.resolutionDate = resolutionDate;

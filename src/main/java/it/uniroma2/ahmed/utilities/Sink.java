@@ -1,11 +1,11 @@
-package it.torvergata.dissanuddinahmed.utilities;
+package it.uniroma2.ahmed.utilities;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import it.torvergata.dissanuddinahmed.logging.SeLogger;
-import it.torvergata.dissanuddinahmed.model.ClassifierResult;
-import it.torvergata.dissanuddinahmed.model.JavaClass;
-import it.torvergata.dissanuddinahmed.model.Release;
+import it.uniroma2.ahmed.logging.SeLogger;
+import it.uniroma2.ahmed.model.ClassifierResult;
+import it.uniroma2.ahmed.model.JavaClass;
+import it.uniroma2.ahmed.model.Release;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
@@ -79,7 +79,6 @@ public class Sink {
             """;
 
 
-
     private Sink() {
     }
 
@@ -114,9 +113,9 @@ public class Sink {
 
     public static void serializeToJson(String projectName, String fileName, Object data,
                                        FileExtension fileExtension) {
+
         if (data instanceof JSONObject jsonObject) {
-            Runnable thread = () -> Sink.sinkJson(projectName, fileName, jsonObject, fileExtension);
-            thread.run();
+            Sink.sinkJson(projectName, fileName, jsonObject, fileExtension);
 
         }
     }
@@ -124,72 +123,70 @@ public class Sink {
     public static void serializeInjectionToCsv(String projectName, String filename,
                                                List<Release> releases, List<JavaClass> javaClasses,
                                                DataSetType dataSetType) {
-        Runnable thread = () -> {
-            final String datasetPath = DATASET_PATH + projectName + File.separator +
-                    FileExtension.CSV.name().toLowerCase(Locale.getDefault()) + File.separator
-                    + dataSetType.toString()
-                    .toLowerCase(Locale.getDefault());
-            try {
-                File file = getFile(filename, FileExtension.CSV, datasetPath);
+
+        final String datasetPath = DATASET_PATH + projectName + File.separator +
+                FileExtension.CSV.name().toLowerCase(Locale.getDefault()) + File.separator
+                + dataSetType.toString()
+                .toLowerCase(Locale.getDefault());
+        try {
+            File file = getFile(filename, FileExtension.CSV, datasetPath);
 
 
-                try (FileWriter fileWriter = new FileWriter(file)) {
+            try (FileWriter fileWriter = new FileWriter(file)) {
 
-                    fileWriter.append(Sink.CSV_HEADERS_INPUTS);
-                    appendInjectionData(fileWriter, releases, javaClasses, false);
+                fileWriter.append(Sink.CSV_HEADERS_INPUTS);
+                appendInjectionData(fileWriter, releases, javaClasses, false);
 
-                }
-            } catch (IOException e) {
-                SeLogger.getInstance().getLogger().severe(e.getMessage());
             }
-        };
+        } catch (IOException e) {
+            SeLogger.getInstance().getLogger().severe(e.getMessage());
+        }
 
-        thread.run();
+
     }
 
     public static void serializeInjectionToArff(String projectName, String filename,
                                                 List<Release> releases, List<JavaClass> javaClasses,
                                                 DataSetType dataSetType) {
-        Runnable thread = () -> {
-            final String datasetPath = DATASET_PATH + projectName + File.separator +
-                    FileExtension.ARFF.name().toLowerCase(Locale.getDefault()) + File.separator
-                    + dataSetType.toString()
-                    .toLowerCase(Locale.getDefault());
-            try {
-                File file = getFile(filename, FileExtension.ARFF, datasetPath);
+
+        final String datasetPath = DATASET_PATH + projectName + File.separator +
+                FileExtension.ARFF.name().toLowerCase(Locale.getDefault()) + File.separator
+                + dataSetType.toString()
+                .toLowerCase(Locale.getDefault());
+        try {
+            File file = getFile(filename, FileExtension.ARFF, datasetPath);
 
 
-                try (FileWriter fileWriter = new FileWriter(file)) {
-                    fileWriter.append(Sink.ARFF_RELATION).append(filename)
-                            .append('.')
-                            .append(FileExtension.ARFF.name().toLowerCase(Locale.getDefault()))
-                            .append("\n\n")
-                            .append(Sink.ARFF_ATTRIBUTE_AND_DATA);
-                    appendInjectionData(fileWriter, releases, javaClasses, true);
-                }
-            } catch (IOException e) {
-                SeLogger.getInstance().getLogger().severe(e.getMessage());
+            try (FileWriter fileWriter = new FileWriter(file)) {
+                fileWriter.append(Sink.ARFF_RELATION).append(filename)
+                        .append('.')
+                        .append(FileExtension.ARFF.name().toLowerCase(Locale.getDefault()))
+                        .append("\n\n")
+                        .append(Sink.ARFF_ATTRIBUTE_AND_DATA);
+                appendInjectionData(fileWriter, releases, javaClasses, true);
             }
-        };
+        } catch (IOException e) {
+            SeLogger.getInstance().getLogger().severe(e.getMessage());
+        }
 
-        thread.run();
+
     }
 
-    public static void serializeResultsToCsv(String projectName, List<ClassifierResult> results){
-        Runnable thread = () -> {
-            final String resultsPath = Sink.RESULT_PATH + projectName + File.separator;
-            final String filename = projectName.toLowerCase(Locale.getDefault()) + "_report";
-            try {
-                File file = getFile(filename, FileExtension.CSV, resultsPath);
-                try (FileWriter fileWriter = new FileWriter(file)) {
-                    fileWriter.append(Sink.CSV_HEADER_RESULTS);
-                    appendResultsData(projectName, fileWriter, results);
-                }
-            } catch (IOException e) {
-                SeLogger.getInstance().getLogger().severe(e.getMessage());
+    public static void serializeResultsToCsv(String projectName, List<ClassifierResult> results) {
+
+        final String resultsPath = Sink.RESULT_PATH + projectName + File.separator;
+        final String filename = projectName.toLowerCase(Locale.getDefault()) + "_report";
+        try {
+            File file = getFile(filename, FileExtension.CSV, resultsPath);
+            try (FileWriter fileWriter = new FileWriter(file)) {
+                fileWriter.append(Sink.CSV_HEADER_RESULTS);
+                appendResultsData(projectName, fileWriter, results);
             }
-        };
-        thread.run();
+        } catch (IOException e) {
+            SeLogger.getInstance().getLogger().severe(e.getMessage());
+        }
+
+
     }
 
     private static void appendInjectionData(FileWriter fileWriter, List<Release> releases,
@@ -254,19 +251,19 @@ public class Sink {
                     .append(String.valueOf(classifierResult.getWalkForwardIteration())).append(",")
                     .append(String.valueOf(classifierResult.getTrainingPercent())).append(",")
                     .append(classifierResult.getClassifierName()).append(",");
-            if(classifierResult.isFeatureSelection()){
+            if (classifierResult.isFeatureSelection()) {
                 fileWriter.append(classifierResult.getCustomClassifier().getFeatureSelectionFilterName()).append(",");
-            }else {
+            } else {
                 fileWriter.append("None").append(",");
             }
-            if(classifierResult.hasSampling()){
+            if (classifierResult.hasSampling()) {
                 fileWriter.append(classifierResult.getCustomClassifier().getSamplingFilterName()).append(",");
-            }else {
+            } else {
                 fileWriter.append("None").append(",");
             }
-            if (classifierResult.isCostSensitive()){
+            if (classifierResult.isCostSensitive()) {
                 fileWriter.append("SensitiveLearning").append(",");
-            }else {
+            } else {
                 fileWriter.append("None").append(",");
             }
             fileWriter.append(String.valueOf(classifierResult.getPrecision())).append(",")

@@ -1,6 +1,7 @@
-package it.torvergata.dissanuddinahmed.controller;
+package it.uniroma2.ahmed.controller;
 
-import it.torvergata.dissanuddinahmed.model.Ticket;
+import it.uniroma2.ahmed.logging.SeLogger;
+import it.uniroma2.ahmed.model.Ticket;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -8,6 +9,7 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
 public class PreProcessProportion {
@@ -33,7 +35,8 @@ public class PreProcessProportion {
         ZOOKEEPER
     }
 
-    private static Double coldStartComputedProportion = null;
+    private static final ReentrantLock coldStartLock = new ReentrantLock();
+    private static double coldStartComputedProportion = -1.0;
 
     private static double incrementalProportionComputation(List<Ticket> filteredTicketsList,
                                                            Ticket ticket, boolean newEntry, boolean computation,
@@ -87,7 +90,7 @@ public class PreProcessProportion {
         return false;
     }
 
-    private static synchronized void addProportion(OtherProjects projName, JSONArray array,
+    private static void addProportion(OtherProjects projName, JSONArray array,
                                                    @NotNull List<Double> proportions, double proportion) {
         JSONObject entry = new JSONObject();
         entry.put("name", projName.name());
@@ -96,61 +99,76 @@ public class PreProcessProportion {
         array.put(entry);
     }
 
-    private static synchronized double coldStartProportionComputation(Ticket ticket, boolean doActualComputation,
-                                                  JSONObject reportJson) {
+    private static double coldStartProportionComputation(Ticket ticket, boolean doActualComputation,
+                                                         JSONObject reportJson) {
         writeUsedOrNot(ticket, doActualComputation, false, reportJson);
-        JSONObject entry = new JSONObject();
-        JSONArray array = new JSONArray();
-        if (coldStartComputedProportion != null) {
+
+        if (coldStartComputedProportion != -1) {
+            JSONObject entry = new JSONObject();
             entry.put(AVERAGE_PROPORTION, coldStartComputedProportion);
             entry.put(COLD_START, true);
-            return PreProcessProportion.coldStartComputedProportion;
+            reportJson.put(COLD_START_ANALYZE, entry);
+            return coldStartComputedProportion;
         }
-        List<Double> proportionList = new ArrayList<>();
+
+        coldStartLock.lock();
+
+        // Double-check after acquiring the lock
+        if (coldStartComputedProportion != -1) {
+            JSONObject entry = new JSONObject();
+            entry.put(AVERAGE_PROPORTION, coldStartComputedProportion);
+            entry.put(COLD_START, true);
+            reportJson.put(COLD_START_ANALYZE, entry);
+            coldStartLock.unlock();
+            return coldStartComputedProportion;
+        }
+
         logger.info("called cold start");
 
-        for (OtherProjects projName : OtherProjects.values()) {
+        List<Double> proportionList = new ArrayList<>();
+        JSONArray array = new JSONArray();
+        JSONObject entry = new JSONObject();
 
+        for (OtherProjects projName : OtherProjects.values()) {
             JiraInjection jiraInjection = new JiraInjection(projName.toString());
             try {
-
                 jiraInjection.injectReleases();
-
                 jiraInjection.pullIssues();
-
                 jiraInjection.filterFixedNormally();
-
             } catch (IOException | URISyntaxException e) {
                 logger.severe(e.getMessage());
             }
 
             List<Ticket> filteredTickets = jiraInjection.getTicketsWithAffectedVersion();
             if (filteredTickets.size() >= THRESHOLD_FOR_COLD_START) {
-                PreProcessProportion.addProportion(projName, array, proportionList, incrementalProportionComputation(
-                        filteredTickets, ticket, false, doActualComputation, reportJson));
+                double proportion = incrementalProportionComputation(
+                        filteredTickets, ticket, false, doActualComputation, reportJson
+                );
+                addProportion(projName, array, proportionList, proportion);
             }
-
-
         }
-
 
         Collections.sort(proportionList);
-        double median;
-
+        double median = 0.0;
         int size = proportionList.size();
-
-        if (size % 2 == 0) {
-            median = (proportionList.get((size / 2) - 1) + proportionList.get(size / 2)) / 2;
-        } else {
-            median = proportionList.get(size / 2);
+        if (size > 0) {
+            median = (size % 2 == 0)
+                    ? (proportionList.get((size / 2) - 1) + proportionList.get(size / 2)) / 2
+                    : proportionList.get(size / 2);
         }
+
         entry.put(COLD_START_MEDIAN, median);
         entry.put(PROJECT_ANALYZED, array);
         reportJson.put(COLD_START_ANALYZE, entry);
 
         coldStartComputedProportion = median;
+        coldStartLock.unlock();
+        String msg = "cold start: " + coldStartComputedProportion;
+        SeLogger.getInstance().getLogger().info(msg);
         return median;
+
     }
+
 
     public double computeProportion(List<Ticket> fixedTicketsList,
                                     Ticket ticket, boolean doActualComputation,

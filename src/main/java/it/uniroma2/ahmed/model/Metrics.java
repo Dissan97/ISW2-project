@@ -1,4 +1,4 @@
-package it.torvergata.dissanuddinahmed.model;
+package it.uniroma2.ahmed.model;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -59,5 +59,8 @@ public class Metrics {
 
     }
 
-
+    @Override
+    public String toString() {
+        return "bug=" + bug;
+    }
 }

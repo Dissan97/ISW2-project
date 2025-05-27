@@ -1,8 +1,8 @@
-package it.torvergata.dissanuddinahmed.controller;
+package it.uniroma2.ahmed.controller;
 
-import it.torvergata.dissanuddinahmed.logging.SeLogger;
-import it.torvergata.dissanuddinahmed.model.*;
-import it.torvergata.dissanuddinahmed.utilities.Sink;
+import it.uniroma2.ahmed.logging.SeLogger;
+import it.uniroma2.ahmed.model.*;
+import it.uniroma2.ahmed.utilities.Sink;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 import java.io.IOException;
@@ -18,7 +18,7 @@ public class PreprocessMetrics {
         this.gitCtrl = gitController;
     }
 
-    public void startPreprocessing() {
+    public void start() {
         this.computeSize();
         this.computeRevisionsNumber();
         this.computeFixNumber();

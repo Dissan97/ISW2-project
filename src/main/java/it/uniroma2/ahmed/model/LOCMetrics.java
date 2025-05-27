@@ -1,4 +1,4 @@
-package it.torvergata.dissanuddinahmed.model;
+package it.uniroma2.ahmed.model;
 
 
 import lombok.Getter;

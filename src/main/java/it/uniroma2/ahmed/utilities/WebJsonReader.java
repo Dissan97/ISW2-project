@@ -1,4 +1,4 @@
-package it.torvergata.dissanuddinahmed.utilities;
+package it.uniroma2.ahmed.utilities;
 
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONException;

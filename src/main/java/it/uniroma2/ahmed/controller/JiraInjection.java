@@ -1,9 +1,9 @@
-package it.torvergata.dissanuddinahmed.controller;
+package it.uniroma2.ahmed.controller;
 
-import it.torvergata.dissanuddinahmed.model.Release;
-import it.torvergata.dissanuddinahmed.model.Ticket;
-import it.torvergata.dissanuddinahmed.utilities.Sink;
-import it.torvergata.dissanuddinahmed.utilities.WebJsonReader;
+import it.uniroma2.ahmed.model.Release;
+import it.uniroma2.ahmed.model.Ticket;
+import it.uniroma2.ahmed.utilities.Sink;
+import it.uniroma2.ahmed.utilities.WebJsonReader;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

@@ -1,4 +1,4 @@
-package it.torvergata.dissanuddinahmed.logging;
+package it.uniroma2.ahmed.logging;
 
 import java.io.IOException;
 import java.io.InputStream;

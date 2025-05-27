@@ -42,3 +42,6 @@ build/
 
 deliveryOutput/*
 deliveryOutput
+
+pmdAnalysis/*
+pmdAnalysis
