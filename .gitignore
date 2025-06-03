@@ -45,3 +45,6 @@ deliveryOutput
 
 pmdAnalysis/*
 pmdAnalysis
+dependency-reduced-pom.xml
+
+state
