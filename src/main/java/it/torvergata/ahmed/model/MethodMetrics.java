@@ -39,12 +39,13 @@ public class MethodMetrics {
     private final Set<String> authors = new HashSet<>();
 
     /**
-     * Total churn: sum of all lines of code added and deleted in the method over time.
+     * Total churn: sum of all lines of code added
      */
-    private int churn = 0;
-
-
-
+    private int addedChurn = 0;
+    /**
+     *  Total churn: sum of all lines of code deleted in the method over time.
+     */
+    private int removedChurn = 0;
 
     /**
      * Number of physical (or non-commented) lines of code in the method.
@@ -92,6 +93,7 @@ public class MethodMetrics {
     private String methodAccessor;
     private int numberOfFix = 0;
 
+
     public void addAuthor(String author) {
         authors.add(author);
     }
@@ -99,8 +101,9 @@ public class MethodMetrics {
         this.numOfChanges++;
     }
 
-    public void addChurn(int churn) {
-        this.churn += churn;
+    public void addChurn(int added, int removed) {
+        this.addedChurn += added;
+        this.removedChurn += removed;
     }
 
     public int getNumOfAuthors() {
@@ -111,6 +114,9 @@ public class MethodMetrics {
         this.numberOfFix += 1;
     }
 
+    public void incCodeSmells() {
+        this.numberOfCodeSmells++;
+    }
     @Override
     public String toString() {
         return "MethodMetrics{" +
@@ -118,7 +124,7 @@ public class MethodMetrics {
                 ", numOfChanges=" + numOfChanges +
                 ", authors=" + authors +
                 ", numOfAuthors=" + authors.size() +
-                ", churn=" + churn +
+                ", churn=" + addedChurn +
                 ", linesOfCode=" + linesOfCode +
                 ", statementCount=" + statementCount +
                 ", cyclomaticComplexity=" + cyclomaticComplexity +
@@ -135,7 +141,7 @@ public class MethodMetrics {
         return String.valueOf(linesOfCode) + ',' +
                 numOfChanges + ',' +
                 authors.size() + ',' +
-                churn + ',' +
+                addedChurn + ',' +
                 statementCount + ',' +
                 cyclomaticComplexity + ',' +
                 cognitiveComplexity + ',' +
@@ -159,7 +165,5 @@ public class MethodMetrics {
     }
 
 
-    public void incCodeSmells() {
-        this.numberOfCodeSmells++;
-    }
+
 }

@@ -4,6 +4,7 @@ import com.github.javaparser.Position;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.stmt.BlockStmt;
 import it.torvergata.ahmed.utilities.JavaParserUtil;
 import lombok.Getter;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -26,7 +27,7 @@ public class JavaClass {
      * Key: Method declaration
      * Value: method String body
      */
-    private final Map<String, String> methods;
+    private final Map<String, BlockStmt> methods;
     /**
      * Key: Method declaration
      * Value: Metrics
@@ -93,21 +94,27 @@ public class JavaClass {
         cu.findAll(MethodDeclaration.class).forEach(methodDeclaration -> {
 
             String signature = JavaParserUtil.getSignature(methodDeclaration);
-            methods.put(signature, JavaParserUtil.getStringBody(methodDeclaration));
-            if (update) {
-                MethodMetrics methodMetrics = new MethodMetrics();
-                methodsMetrics.put(signature, methodMetrics);
-                methodMetrics.addAuthor(commit.getAuthorIdent().getName());
-                methodMetrics.setParameterCount(JavaParserUtil.computeParameterCount(methodDeclaration));
-                methodMetrics.setLinesOfCode(JavaParserUtil.computeEffectiveLOC(methodDeclaration));
-                methodMetrics.setStatementCount(JavaParserUtil.computeStatementCount(methodDeclaration));
-                methodMetrics.setCyclomaticComplexity(JavaParserUtil.computeCyclomaticComplexity(methodDeclaration));
-                methodMetrics.setNestingDepth(JavaParserUtil.computeNestingDepth(methodDeclaration));
-                methodMetrics.setMethodAccessor(methodDeclaration.getAccessSpecifier().asString());
-                methodMetrics.setBeginLine(methodDeclaration.getBegin().orElse(new Position(0, 0)).line);
-                methodMetrics.setEndLine(methodDeclaration.getEnd().orElse(new Position(0, 0)).line);
+            methodDeclaration.getBody().ifPresent(
+                    consumer -> {
+                        methods.put(signature, consumer.asBlockStmt());
+                        if (update) {
+                            MethodMetrics methodMetrics = new MethodMetrics();
+                            methodsMetrics.put(signature, methodMetrics);
+                            methodMetrics.addAuthor(commit.getAuthorIdent().getName());
+                            methodMetrics.setParameterCount(JavaParserUtil.computeParameterCount(methodDeclaration));
+                            methodMetrics.setLinesOfCode(JavaParserUtil.computeEffectiveLOC(methodDeclaration));
+                            methodMetrics.setStatementCount(JavaParserUtil.computeStatementCount(methodDeclaration));
+                            methodMetrics.setCyclomaticComplexity(JavaParserUtil.computeCyclomaticComplexity(methodDeclaration));
+                            methodMetrics.setNestingDepth(JavaParserUtil.computeNestingDepth(methodDeclaration));
+                            methodMetrics.setMethodAccessor(methodDeclaration.getAccessSpecifier().asString());
+                            methodMetrics.setBeginLine(methodDeclaration.getBegin().orElse(new Position(0, 0)).line);
+                            methodMetrics.setEndLine(methodDeclaration.getEnd().orElse(new Position(0, 0)).line);
 
-            }
+                        }
+                    }
+            );
+
+
         });
         // we won't check main methods that could be added to do something
         methodsMetrics.keySet().removeIf(key -> key.contains(MAIN_METHOD_SIGNATURE));

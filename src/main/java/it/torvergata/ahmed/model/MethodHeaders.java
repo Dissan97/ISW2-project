@@ -11,7 +11,8 @@ public enum MethodHeaders {
     LINES_OF_CODE,
     NUMBER_OF_CHANGES,
     NUMBER_OF_AUTHORS,
-    CHURN,
+    ADDED_CHURN,
+    REMOVED_CHURN,
     STATEMENT_COUNT,
     CYCLOMATIC_COMPLEXITY,
     COGNITIVE_COMPLEXITY,
@@ -39,7 +40,7 @@ public enum MethodHeaders {
                 sb.append(key).append(",");
                 sb.append(metrics.getNumOfChanges()).append(",");
                 sb.append(metrics.getNumOfAuthors()).append(",");
-                sb.append(metrics.getChurn()).append(",");
+                sb.append(metrics.getAddedChurn()).append(",");
                 sb.append(metrics.getLinesOfCode()).append(",");
                 sb.append(metrics.getStatementCount()).append(",");
                 sb.append(metrics.getCyclomaticComplexity()).append(",");

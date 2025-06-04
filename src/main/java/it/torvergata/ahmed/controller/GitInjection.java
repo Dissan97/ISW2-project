@@ -4,11 +4,12 @@ import com.github.javaparser.ParseProblemException;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.stmt.BlockStmt;
 import it.torvergata.ahmed.Main;
 import it.torvergata.ahmed.logging.SeLogger;
 import it.torvergata.ahmed.model.*;
 import it.torvergata.ahmed.utilities.CodeSmellParser;
-import it.torvergata.ahmed.utilities.JavaParserUtil;
+import it.torvergata.ahmed.utilities.DiffUtils;
 import lombok.Getter;
 import lombok.Setter;
 import org.eclipse.jgit.api.Git;
@@ -37,6 +38,8 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
+
+
 
 /**
  * Class controller responsible to link Jira-Ticket with GitHub commits and fill all the metadata
@@ -107,11 +110,11 @@ public class GitInjection {
                 }
             }
         }
-        revCommits.sort(Comparator.comparing(revCommit -> revCommit.getCommitterIdent().getWhen()));
+        revCommits.sort(Comparator.comparing(revCommit -> revCommit.getCommitterIdent().getWhenAsInstant()));
         this.commits = new ArrayList<>();
         for (RevCommit revCommit : revCommits) {
             SimpleDateFormat formatter = new SimpleDateFormat(GitInjection.LOCAL_DATE_FORMAT);
-            LocalDate commitDate = LocalDate.parse(formatter.format(revCommit.getCommitterIdent().getWhen()));
+            LocalDate commitDate = LocalDate.parse(formatter.format(revCommit.getCommitterIdent().getWhenAsInstant()));
             LocalDate lowerBoundDate = LocalDate.parse(formatter.format(new Date(0)));
 
             for (Release release : this.releases) {
@@ -129,7 +132,7 @@ public class GitInjection {
         for (Release release : this.releases) {
             release.setId(++i);
         }
-        this.commits.sort(Comparator.comparing(o -> o.getRevCommit().getCommitterIdent().getWhen()));
+        this.commits.sort(Comparator.comparing(o -> o.getRevCommit().getCommitterIdent().getWhenAsInstant()));
     }
 
     /**
@@ -201,7 +204,8 @@ public class GitInjection {
             latestCommits.add(tempCommits.getLast());
         }
 
-        latestCommits.sort(Comparator.comparing(commit -> commit.getRevCommit().getCommitterIdent().getWhen()));
+        latestCommits.sort(Comparator.comparing(commit -> commit.getRevCommit().getCommitterIdent()
+                .getWhenAsInstant()));
 
         for (Commit commit : latestCommits) {
             Map<String, String> nameAndClassContent = getAllClassesNameAndContent(commit.getRevCommit(),
@@ -226,6 +230,9 @@ public class GitInjection {
         );
 
     }
+
+
+
 
     private void checkCodeParseCodeSmells() {
         String outputDirPath = PMD_ANALYSIS + File.separator + this.project;
@@ -351,19 +358,7 @@ public class GitInjection {
                             .open(treeWalk.getObjectId(0))
                             .getBytes(), StandardCharsets.UTF_8));
                     cu.findAll(MethodDeclaration.class).forEach(
-                            methodDeclaration -> {
-                                String methodName = methodDeclaration.getDeclarationAsString();
-                                if (javaClass.getMethods().get(methodName) != null) {
-                                    methodDeclaration.getBody().ifPresent(
-                                            body -> {
-                                                if (JavaParserUtil.getStringBody(methodDeclaration)
-                                                        .equals(javaClass.getMethods().get(methodName))) {
-                                                    javaClass.getMethodsMetrics().get(methodName).incFix();
-                                                }
-                                            }
-                                    );
-                                }
-                            }
+                            methodDeclaration -> DiffUtils.analyzeDiff(javaClass, methodDeclaration)
                     );
                 }
             }
@@ -428,7 +423,8 @@ public class GitInjection {
             for (Commit commit : commitsContainingTicket) {
                 SimpleDateFormat formatter = new SimpleDateFormat(GitInjection.LOCAL_DATE_FORMAT);
                 RevCommit revCommit = commit.getRevCommit();
-                LocalDate commitDate = LocalDate.parse(formatter.format(revCommit.getCommitterIdent().getWhen()));
+                LocalDate commitDate = LocalDate.parse(formatter.format(revCommit.getCommitterIdent()
+                        .getWhenAsInstant()));
                 if (!commitDate.isAfter(ticket.getResolutionDate())
                         && !commitDate.isBefore(ticket.getCreationDate())) {
                     List<String> modifiedClassesNames = getTouchedClassesNames(revCommit);
@@ -475,7 +471,7 @@ public class GitInjection {
                                                 && jc.getRelease().getId() >= injectedVersion.getId())
                                 .forEach(buggyClass -> buggyClass.getMethods()
                                         .forEach((signature, body) -> {
-                                            String fixedBody = fixedVersionClass.getMethods().get(signature);
+                                            BlockStmt fixedBody = fixedVersionClass.getMethods().get(signature);
                                             // if the method is touched than is marked buggy may be added some other metrics check
                                             if (fixedBody == null || !fixedBody.equals(body)) {
                                                 buggyClass.getMethodsMetrics()
@@ -596,7 +592,7 @@ public class GitInjection {
             inner.put(RELEASE, release.getReleaseName());
             inner.put("creationDate",
                     String.valueOf(LocalDate.parse((new SimpleDateFormat(GitInjection.LOCAL_DATE_FORMAT)
-                            .format(revCommit.getCommitterIdent().getWhen())
+                            .format(revCommit.getCommitterIdent().getWhenAsInstant())
                     ))));
             mapCommits.put(revCommit.getName(), inner.toString());
         }

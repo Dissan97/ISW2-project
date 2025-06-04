@@ -27,8 +27,9 @@ public class Main {
         }
 
         try {
+            String pmdCommand = pmdHome + File.separator + "bin" + File.separator + (isWindows() ? "pmd.bat" : "pmd");
             new ProcessBuilder(
-                    pmdHome + File.separator + "bin" + File.separator + "pmd",
+                    pmdCommand,
                             "--",
                             "version"
             ).start().waitFor();
@@ -36,7 +37,8 @@ public class Main {
             Thread.currentThread().interrupt();
             System.exit(-1);
         } catch (IOException e) {
-            logger.severe("cannot find pmd in the system");
+            String msg = "cannot find pmd in the system: " + e.getMessage();
+            logger.severe(msg);
             System.exit(-1);
         }
 
@@ -51,4 +53,7 @@ public class Main {
         logger.info(finalMessage);
     }
 
+    private static boolean isWindows() {
+        return System.getProperty("os.name").toLowerCase().contains("win");
+    }
 }

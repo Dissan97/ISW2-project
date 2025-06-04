@@ -100,6 +100,7 @@ public class Pipeline implements Runnable{
             info = this.threadIdentity + "start preprocessing project";
             logger.info(info);
             // now must start preprocessing also Method Metrics
+            // TODO: MUST REMOVE THIS STUFF BELOW
             try (BufferedWriter writer = new BufferedWriter(new FileWriter("bookkeper.csv"))){
                 StringBuilder builder = new StringBuilder();
                 builder.append(MethodHeaders.getCsvHeaders()).append('\n');
@@ -112,9 +113,10 @@ public class Pipeline implements Runnable{
                                                         .append(javaClass.getName()).append(';')
                                                         .append(s).append(';')
                                                         .append(me.getLinesOfCode()).append(';')
-                                                        .append(me.getNumOfChanges()).append(';')
+                                                        .append(me.getNumberOfFix()).append(';')
                                                         .append(me.getNumOfAuthors()).append(';')
-                                                        .append(me.getChurn()).append(';')
+                                                        .append(me.getAddedChurn()).append(';')
+                                                        .append(me.getRemovedChurn()).append(';')
                                                         .append(me.getStatementCount()).append(';')
                                                         .append(me.getCyclomaticComplexity()).append(';')
                                                         .append(me.getCognitiveComplexity()).append(';')
@@ -133,6 +135,7 @@ public class Pipeline implements Runnable{
 
             }
 
+            System.exit(0);
             PreprocessMetrics preprocessMetrics = new PreprocessMetrics(gitInjection);
             preprocessMetrics.start();
             storeCurrentData(jiraInjection, gitInjection);
