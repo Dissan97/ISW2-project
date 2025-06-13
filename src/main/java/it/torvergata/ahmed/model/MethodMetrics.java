@@ -135,9 +135,7 @@ public class MethodMetrics {
     public void incCodeSmells() {
         this.numberOfCodeSmells++;
     }
-    public void incAge() {
-        this.age += 1;
-    }
+
     public int getAvgChurn() {
         return this.numberOfChanges > 0 ? this.addedChurn + this.removedChurn / this.numberOfChanges : 0;
     }
