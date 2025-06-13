@@ -15,10 +15,18 @@ public class CustomClassifier {
                             String bestFirstDirection, String samplingFilterName, boolean isCostSensitive) {
         this.classifier = classifier;
         switch (samplingFilterName) {
-            case "Resample" -> this.samplingFilterName = "OverSampling";
-            case "SpreadSubsample" -> this.samplingFilterName = "UnderSampling";
-            case "SMOTE" -> this.samplingFilterName = "SMOTE";
-            default -> this.samplingFilterName = samplingFilterName;
+            case "Resample":
+                this.samplingFilterName = "OverSampling";
+                break;
+            case "SpreadSubsample":
+                this.samplingFilterName = "UnderSampling";
+                break;
+            case "SMOTE":
+                this.samplingFilterName = "SMOTE";
+                break;
+            default:
+                this.samplingFilterName = samplingFilterName;
+                break;
         }
         if (featureSelectionFilterName.equals("BestFirst")) {
             this.featureSelectionFilterName = featureSelectionFilterName + "(" + bestFirstDirection + ")";

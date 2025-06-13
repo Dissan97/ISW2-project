@@ -28,7 +28,7 @@ public class ProgramFlow {
         CountDownLatch latch = new CountDownLatch(threads);
         int count = 0;
 
-        try (ExecutorService executorService = Executors.newFixedThreadPool(threads)) {
+        try (ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())) {
             while (keys.hasNext()) {
                 String key = keys.next();
                 String value = targets.getString(key);

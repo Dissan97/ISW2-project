@@ -1,16 +1,12 @@
 package it.torvergata.ahmed.controller;
 
 import it.torvergata.ahmed.logging.SeLogger;
-import it.torvergata.ahmed.model.MethodHeaders;
 import it.torvergata.ahmed.model.Release;
 import it.torvergata.ahmed.utilities.Sink;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.Logger;
@@ -22,56 +18,56 @@ public class Pipeline implements Runnable{
     private final Logger logger;
     private final CountDownLatch latch;
     private final String threadIdentity;
-
+    private int msgCount = 0;
     public Pipeline(int threadId, CountDownLatch countDownLatch, @NotNull String projectName, String projectUrl){
         this.targetName = projectName.toUpperCase();
         this.targetUrl = projectUrl;
         this.logger = SeLogger.getInstance().getLogger();
-        this.threadIdentity = "Thread: { Id: " + threadId + ", project: " + projectName  +" }<< ";
+        this.threadIdentity = threadId + "-" + projectName;
         this.latch = countDownLatch;
     }
-    
 
     private void injectAndProcess() {
-        String info = this.threadIdentity + "starting processing project:\n\tname=" + this.targetName +
-                "\n\turlTarget=" + this.targetUrl;
+
+
+        String info = getPipeMsg("starting processing project");
         logger.info(info);
 
         long overallStart = System.nanoTime();
 
-        String seconds = " seconds";
+        final String seconds = " seconds";
         try {
             long start;
             long end;
 
             // Start Injection Phase
             start = System.nanoTime();
-            info = this.threadIdentity + "start injection phase";
+            info = getPipeMsg("starting injection phase");
             logger.info(info);
 
             JiraInjection jiraInjection = new JiraInjection(this.targetName);
             jiraInjection.injectReleases();
             end = System.nanoTime();
-            info = this.threadIdentity + "start releases injection took: " + getTimeInSeconds(start, end) + seconds;
+            info = getPipeMsg("start releases injection took: " + getTimeInSeconds(start, end) + seconds);
             logger.info(info);
 
             start = System.nanoTime();
             List<Release> releases = jiraInjection.getReleases();
             end = System.nanoTime();
-            info = this.threadIdentity + "releases injection complete took: " + getTimeInSeconds(start, end) +
-                    seconds;
+            info = getPipeMsg("releases injection complete took: " + getTimeInSeconds(start, end) +
+                    seconds);
             logger.info(info);
 
             // Commit Injection
             start = System.nanoTime();
-            info = this.threadIdentity + "start commit injection";
+            info = getPipeMsg("start commit injection");
             logger.info(info);
 
             GitInjection gitInjection = new GitInjection(this.targetName, this.targetUrl, releases);
             gitInjection.injectCommits();
             end = System.nanoTime();
-            info = this.threadIdentity + "commits injection complete took: " + getTimeInSeconds(start, end) +
-                    seconds;
+            info = getPipeMsg("commits injection complete took: " + getTimeInSeconds(start, end) +
+                    seconds);
             logger.info(info);
 
             start = System.nanoTime();
@@ -79,115 +75,86 @@ public class Pipeline implements Runnable{
             gitInjection.setTickets(jiraInjection.getFixedTickets());
             gitInjection.preprocessCommitsWithIssue();
             end = System.nanoTime();
-            info = this.threadIdentity + "ticket injection and commit preprocessing took: " +
-                    getTimeInSeconds(start, end) + seconds;
+            info = getPipeMsg("ticket injection and commit preprocessing took: " +
+                    getTimeInSeconds(start, end) + seconds);
             logger.info(info);
 
             // Java Class Injection
             start = System.nanoTime();
-            info = this.threadIdentity + "start java class injection";
+            info = getPipeMsg("start java class injection");
             logger.info(info);
 
             gitInjection.preprocessJavaClasses();
             end = System.nanoTime();
-            info = this.threadIdentity + "java class injection complete took: " + getTimeInSeconds(start, end)
-                    + seconds;
+            info = getPipeMsg("java class injection complete took: " + getTimeInSeconds(start, end)
+                    + seconds);
             logger.info(info);
             gitInjection.closeRepo();
 
             // Preprocessing Project
             start = System.nanoTime();
-            info = this.threadIdentity + "start preprocessing project";
+            info = getPipeMsg("start preprocessing project");
             logger.info(info);
             // now must start preprocessing also Method Metrics
-            // TODO: MUST REMOVE THIS STUFF BELOW
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter("bookkeper.csv"))){
-                StringBuilder builder = new StringBuilder();
-                builder.append(MethodHeaders.getCsvHeaders()).append('\n');
-                gitInjection.getJavaClassPerRelease().forEach(
-                        (r, jc)-> jc.forEach(
-                                javaClass -> javaClass.getMethodsMetrics().forEach(
-                                        (s, me)-> {
-                                            if (r.getId() < gitInjection.getJavaClassPerRelease().size() * 0.33) {
-                                                builder.append(r.getId()).append(';')
-                                                        .append(javaClass.getName()).append(';')
-                                                        .append(s).append(';')
-                                                        .append(me.getLinesOfCode()).append(';')
-                                                        .append(me.getNumberOfFix()).append(';')
-                                                        .append(me.getNumOfAuthors()).append(';')
-                                                        .append(me.getAddedChurn()).append(';')
-                                                        .append(me.getRemovedChurn()).append(';')
-                                                        .append(me.getStatementCount()).append(';')
-                                                        .append(me.getCyclomaticComplexity()).append(';')
-                                                        .append(me.getCognitiveComplexity()).append(';')
-                                                        .append(me.getNestingDepth()).append(';')
-                                                        .append(me.getParameterCount()).append(';')
-                                                        .append(me.getNumberOfCodeSmells()).append(';')
-                                                        .append(me.isBug()).append('\n');
-                                            }
-                                        }
-                                )
-
-                        )
-                );
-                writer.write(builder.toString());
-            }catch (IOException e){
-
-            }
-
-            System.exit(0);
+            Sink.serializeProjectAsCsv(gitInjection);
             PreprocessMetrics preprocessMetrics = new PreprocessMetrics(gitInjection);
             preprocessMetrics.start();
             storeCurrentData(jiraInjection, gitInjection);
             end = System.nanoTime();
-            info = this.threadIdentity + "preprocessing project complete took: " + getTimeInSeconds(start, end) +
-                    seconds;
+            info = getPipeMsg("preprocessing project complete took: " + getTimeInSeconds(start, end) +
+                    seconds);
             logger.info(info);
 
-            info = this.threadIdentity + "injection phase complete";
+            info = getPipeMsg("injection phase complete");
             logger.info(info);
 
             // Dataset Generation
             start = System.nanoTime();
             preprocessMetrics.generateDataset(targetName);
             end = System.nanoTime();
-            info = this.threadIdentity + "dataset generation complete took: " + getTimeInSeconds(start, end) +
-                    seconds;
+            info = getPipeMsg("dataset generation complete took: " + getTimeInSeconds(start, end) +
+                    seconds);
             logger.info(info);
 
             // Classification Phase
             start = System.nanoTime();
-            info = this.threadIdentity + "start processing phase";
+            info = getPipeMsg("start processing phase");
             logger.info(info);
 
-            info = this.threadIdentity + "starting classification";
+            info = getPipeMsg("starting classification");
             logger.info(info);
 
             WekaProcessing wekaProcessing = new WekaProcessing(this.targetName,
                     jiraInjection.getReleases().size() / 2);
             wekaProcessing.classify();
             end = System.nanoTime();
-            info = this.threadIdentity + "classification complete took: " + getTimeInSeconds(start, end) +
-                    seconds;
+            info = getPipeMsg("classification complete took: " + getTimeInSeconds(start, end) +
+                    seconds);
             logger.info(info);
-
             // Sinking Results
             start = System.nanoTime();
             wekaProcessing.sinkResults();
             end = System.nanoTime();
-            info = this.threadIdentity + "sink results complete took: " + getTimeInSeconds(start, end) +
-                    seconds;
+            info = getPipeMsg("sink results complete took: " + getTimeInSeconds(start, end) +
+                    seconds);
             logger.info(info);
 
         } catch (Exception e) {
             logger.severe("error: " + e.getMessage());
         } finally {
             long overallEnd = System.nanoTime();
-            info = this.threadIdentity + "total processing took: " + getTimeInSeconds(overallStart, overallEnd) +
-                    seconds;
+            info = getPipeMsg("total processing took: " + getTimeInSeconds(overallStart, overallEnd) +
+                    seconds);
             logger.info(info);
 
         }
+    }
+
+    private String getPipeMsg(String msg) {
+        return String.format("{\"Thread-%s-%d\": {\"project\": %s, \"message\": \"%s\"}}",
+                threadIdentity,
+                msgCount++,
+                this.targetName, msg);
     }
 
     // Helper method to convert nanoseconds to seconds

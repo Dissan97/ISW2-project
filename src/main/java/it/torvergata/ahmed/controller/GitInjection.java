@@ -4,12 +4,12 @@ import com.github.javaparser.ParseProblemException;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.ast.stmt.BlockStmt;
+import com.github.javaparser.ast.expr.MethodCallExpr;
 import it.torvergata.ahmed.Main;
 import it.torvergata.ahmed.logging.SeLogger;
 import it.torvergata.ahmed.model.*;
 import it.torvergata.ahmed.utilities.CodeSmellParser;
-import it.torvergata.ahmed.utilities.DiffUtils;
+import it.torvergata.ahmed.utilities.JavaParserUtil;
 import lombok.Getter;
 import lombok.Setter;
 import org.eclipse.jgit.api.Git;
@@ -39,8 +39,6 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-
-
 /**
  * Class controller responsible to link Jira-Ticket with GitHub commits and fill all the metadata
  */
@@ -50,6 +48,8 @@ public class GitInjection {
     private static final String GIT = File.separator + ".git";
     public static final String PMD_ANALYSIS = "pmdAnalysis";
     public static final String RELEASE = "release";
+    public static final String TEST = "Test";
+    public static final String JAVA_EXTENTION = ".java";
     private final String repoPath;
 
     @Getter
@@ -70,6 +70,7 @@ public class GitInjection {
     private final Map<RevCommit, List<String>> modifiedClassesForCommit;
     @Getter
     private Map<Release, List<JavaClass>> javaClassPerRelease = null;
+    @Getter
     private final String project;
 
     /**
@@ -110,11 +111,13 @@ public class GitInjection {
                 }
             }
         }
-        revCommits.sort(Comparator.comparing(revCommit -> revCommit.getCommitterIdent().getWhenAsInstant()));
+        revCommits.sort(Comparator.comparing(revCommit -> Date.from(
+                revCommit.getCommitterIdent().getWhenAsInstant())));
         this.commits = new ArrayList<>();
         for (RevCommit revCommit : revCommits) {
             SimpleDateFormat formatter = new SimpleDateFormat(GitInjection.LOCAL_DATE_FORMAT);
-            LocalDate commitDate = LocalDate.parse(formatter.format(revCommit.getCommitterIdent().getWhenAsInstant()));
+            LocalDate commitDate = LocalDate.parse(formatter.format(Date.from(revCommit.getCommitterIdent()
+                    .getWhenAsInstant())));
             LocalDate lowerBoundDate = LocalDate.parse(formatter.format(new Date(0)));
 
             for (Release release : this.releases) {
@@ -132,7 +135,8 @@ public class GitInjection {
         for (Release release : this.releases) {
             release.setId(++i);
         }
-        this.commits.sort(Comparator.comparing(o -> o.getRevCommit().getCommitterIdent().getWhenAsInstant()));
+        this.commits.sort(Comparator.comparing(o -> Date.from(o.getRevCommit().getCommitterIdent()
+                .getWhenAsInstant())));
     }
 
     /**
@@ -174,7 +178,7 @@ public class GitInjection {
         treeWalk.addTree(tree);
         treeWalk.setRecursive(true);
         while (treeWalk.next()) {
-            if (treeWalk.getPathString().contains(".java") && !treeWalk.getPathString().contains("/test/")) {
+            if (treeWalk.getPathString().contains(JAVA_EXTENTION) && !treeWalk.getPathString().contains("/test/")) {
                 allClasses.put(treeWalk.getPathString(), new String(repository.open(treeWalk.getObjectId(0))
                         .getBytes(), StandardCharsets.UTF_8));
             }
@@ -204,36 +208,129 @@ public class GitInjection {
             latestCommits.add(tempCommits.getLast());
         }
 
-        latestCommits.sort(Comparator.comparing(commit -> commit.getRevCommit().getCommitterIdent()
-                .getWhenAsInstant()));
+        latestCommits.sort(Comparator.comparing(commit -> Date.from(
+                commit.getRevCommit().getCommitterIdent().getWhenAsInstant())));
 
         for (Commit commit : latestCommits) {
             Map<String, String> nameAndClassContent = getAllClassesNameAndContent(commit.getRevCommit(),
                     this.repository);
-            for (Map.Entry<String, String> nameAndContentOfClass : nameAndClassContent.entrySet()) {
-                javaClasses.add(new JavaClass(nameAndContentOfClass.getKey(), nameAndContentOfClass.getValue(),
-                        commit.getRelease(), commit.getRevCommit(), true));
-            }
+            nameAndClassContent.forEach(
+                    (name, content) -> {
+                        if (!name.contains(TEST)) {
+                            javaClasses.add(new JavaClass(name, content,
+                                    commit.getRelease(), true));
+                        }
+                    }
+            );
+
+
         }
 
         this.fillClassesInfo();
         this.checkUpdateInClassCommitted();
         this.javaClasses.sort(Comparator.comparing(JavaClass::getName));
         this.parseJavaClassPerRelease();
+        this.checkMethodAge();
+        this.checkMethodUsage();
         this.updateMethodPerClassCommits();
         this.checkCodeParseCodeSmells();
 
         this.javaClassPerRelease.forEach(
                 (release, classes) -> CodeSmellParser
                         .parseCsvFile(PMD_ANALYSIS + File.separator + this.project
-                        + File.separator + (release.getId() - 1) + ".csv", classes)
+                                + File.separator + (release.getId() - 1) + ".csv", classes)
         );
 
     }
 
 
+    /** Check method age relative current release */
+    private void checkMethodAge() {
+        Map<String, Integer> methodFirstAppearance = new HashMap<>();
+        javaClassPerRelease.entrySet().stream()
+                .sorted(Comparator.comparing(entry -> entry.getKey().getId()))
+                .forEach(entry -> {
+                    Release release = entry.getKey();
 
+                    for (JavaClass javaClass : entry.getValue()) {
+                        for (String methodSig : javaClass.getMethodsMetrics().keySet()) {
 
+                            methodFirstAppearance.putIfAbsent(methodSig, release.getId());
+                        }
+                    }
+                });
+
+        javaClassPerRelease.forEach((release, classList) -> {
+            for (JavaClass jc : classList) {
+                for (Map.Entry<String, MethodMetrics> entry : jc.getMethodsMetrics().entrySet()) {
+                    String methodSig = entry.getKey();
+                    MethodMetrics metrics = entry.getValue();
+
+                    Integer firstAppearance = methodFirstAppearance.get(methodSig);
+                    if (firstAppearance != null) {
+                        int age = release.getId() - firstAppearance;
+                        metrics.setAge(age);
+                    }
+                }
+            }
+        });
+
+    }
+
+    /** Fain in Fan out calculation Method */
+    private void checkMethodUsage() {
+        javaClassPerRelease.forEach((release, classes) -> {
+
+            Map<String, Set<String>> methodCalls = new HashMap<>();
+
+            classes.forEach(jc -> {
+                String className = jc.getClassName();
+                CompilationUnit cu = StaticJavaParser.parse(jc.getClassBody());
+
+                cu.findAll(MethodDeclaration.class).forEach(methodDecl -> {
+                    String callerSig = className + "." + JavaParserUtil.getSignature(methodDecl);
+                    Set<String> callees = new HashSet<>();
+
+                    methodDecl.findAll(MethodCallExpr.class)
+                            .stream()
+                            .map(MethodCallExpr::getNameAsString)
+                            .forEach(callees::add);
+
+                    methodCalls.put(callerSig, callees);
+                });
+            });
+
+            classes.forEach(jc -> {
+                String className = jc.getClassName();
+                jc.getMethodsMetrics().forEach((methodSig, mm) -> {
+                    String fullMethodSig = className + "." + methodSig;
+                    int fanOut = methodCalls.getOrDefault(fullMethodSig, Collections.emptySet()).size();
+                    mm.setFanOut(fanOut);
+                });
+            });
+
+            classes.forEach(callerJc -> {
+                CompilationUnit cu = StaticJavaParser.parse(callerJc.getClassBody());
+                cu.findAll(MethodDeclaration.class).forEach(methodDecl ->
+                        methodDecl.getBody().ifPresent(block ->
+                                block.findAll(MethodCallExpr.class).forEach(callStmt -> {
+                                    String calleeName = callStmt.getNameAsString();
+                                    int argCount = callStmt.getArguments().size();
+
+                                    classes.forEach(possibleCallee ->
+                                            possibleCallee.getMethodsMetrics().values().stream()
+                                            .filter(mm -> mm.getSimpleName().equals(calleeName)
+                                                    && mm.getParameterCount() == argCount)
+                                            .forEach(mm -> mm.setFanIn(mm.getFanIn() + 1)));
+                                })
+                        )
+                );
+            });
+
+        });
+    }
+
+    /** Use PMD to calculate codeSmells */
     private void checkCodeParseCodeSmells() {
         String outputDirPath = PMD_ANALYSIS + File.separator + this.project;
         File outputDir = new File(outputDirPath);
@@ -247,19 +344,19 @@ public class GitInjection {
         }
         this.javaClassPerRelease.keySet()
                 .stream().sorted(Comparator.comparing(Release::getId)).forEach(
-                release -> {
-                    if (release.getId() == 1) {
-                        doPmd(0, release.getCommitList().getLast().getRevCommit());
-                    }
-                    doPmd(release.getId(), release.getCommitList().getLast().getRevCommit());
-                }
-        );
+                        release -> {
+                            if (release.getId() == 1) {
+                                doPmd(0, release.getCommitList().getLast().getRevCommit());
+                            }
+                            doPmd(release.getId(), release.getCommitList().getLast().getRevCommit());
+                        }
+                );
     }
 
     private void doPmd(int releaseId, @NotNull RevCommit commit) {
         String commitId = commit.getName();
         final String reportPath = PMD_ANALYSIS + File.separator + this.project + File.separator + releaseId + ".csv";
-        if ((new File(reportPath).exists())){
+        if ((new File(reportPath).exists())) {
             return;
         }
         try {
@@ -302,7 +399,7 @@ public class GitInjection {
 
     private void cleanGitState() throws IOException {
         String gitDir = repoPath + File.separator + ".git" + File.separator;
-        String[] mergeFiles = { "MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "index" };
+        String[] mergeFiles = {"MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "index"};
         for (String file : mergeFiles) {
             File f = new File(gitDir + file);
             if (f.exists()) {
@@ -310,7 +407,6 @@ public class GitInjection {
             }
         }
     }
-
 
 
     @Contract("_ -> new")
@@ -329,23 +425,26 @@ public class GitInjection {
     }
 
     private void updateMethodPerClassCommits() {
-        this.javaClassPerRelease.forEach(
-                (k, v) -> v.stream().filter(
-                        javaClass -> {
-                            if (javaClass.getClassCommits() != null) {
-                                return javaClass.getClassCommits().size() > 1;
+        try {
+            this.javaClassPerRelease.forEach(
+                    (release, jc) -> jc.stream().filter(
+                            javaClass -> {
+                                if (javaClass.getClassCommits() != null) {
+                                    return javaClass.getClassCommits().size() > 1;
+                                }
+                                return false;
                             }
-                            return false;
-                        }
-                ).forEach(
-                        javaClass -> javaClass.getClassCommits().subList(0, javaClass.getClassCommits().size() - 1)
-                                .forEach(prevCommit -> checkDiff(javaClass, prevCommit.getRevCommit())
-                                )
-                )
-        );
+                    ).forEach(
+                            javaClass -> moreClassInfo(javaClass, javaClass.
+                                    getClassCommits().getLast().getRevCommit())
+                    )
+            );
+        } catch (NullPointerException ignored) {
+            // skip the class which has no commit
+        }
     }
 
-    private void checkDiff(@NotNull JavaClass javaClass, @NotNull RevCommit revCommit) {
+    private void moreClassInfo(@NotNull JavaClass javaClass, @NotNull RevCommit revCommit) {
         RevTree tree = revCommit.getTree();
         TreeWalk treeWalk = new TreeWalk(repository);
         try {
@@ -358,11 +457,23 @@ public class GitInjection {
                             .open(treeWalk.getObjectId(0))
                             .getBytes(), StandardCharsets.UTF_8));
                     cu.findAll(MethodDeclaration.class).forEach(
-                            methodDeclaration -> DiffUtils.analyzeDiff(javaClass, methodDeclaration)
+                            methodDeclaration -> {
+                                String methodName = methodDeclaration.getDeclarationAsString();
+                                if (javaClass.getMethods().get(methodName) != null) {
+                                    methodDeclaration.getBody().ifPresent(
+
+                                            body -> calcDiff(javaClass, methodDeclaration, methodName)
+
+                                    );
+                                }
+                            }
                     );
                 }
+                checkForTest(treeWalk, javaClass);
+
             }
-        } catch (IOException | ParseProblemException ignored ) {
+
+        } catch (IOException | ParseProblemException ignored) {
             // ignoring this
         } catch (NullPointerException e) {
             // ignoring this step
@@ -370,6 +481,70 @@ public class GitInjection {
                     e.getMessage());
         }
         treeWalk.close();
+    }
+
+    private void checkForTest(@NotNull TreeWalk treeWalk, @NotNull JavaClass javaClass) throws IOException {
+        String pathString = treeWalk.getPathString();
+        long accept = 0L;
+        if (pathString.contains("Test") && pathString.contains(JAVA_EXTENTION)) {
+            CompilationUnit cu = StaticJavaParser.parse(new String(repository
+                    .open(treeWalk.getObjectId(0))
+                    .getBytes(), StandardCharsets.UTF_8));
+
+            accept += cu.getImports().stream().filter(
+                    importUnit -> importUnit.getNameAsString().equals(javaClass.getClassName())
+            ).count();
+
+            accept += cu.getPackageDeclaration().stream().filter(
+                    pkgDecl -> pkgDecl.getNameAsString().equals(javaClass.getClassName())
+            ).count();
+
+            if (accept > 0) {
+                parseTestInfo(cu, javaClass);
+            }
+        }
+    }
+
+    private void parseTestInfo(CompilationUnit cu, @NotNull JavaClass javaClass) {
+        cu.findAll(MethodDeclaration.class).forEach(
+                methodDeclaration -> methodDeclaration.getBody().ifPresent(
+                        blockStmt -> blockStmt.findAll(MethodCallExpr.class).forEach(
+                                callStmt -> javaClass.getMethodsMetrics()
+                                        .values().stream().filter(
+                                                methodMetrics ->
+                                                        (methodMetrics.getSimpleName()
+                                                                .equals(callStmt.getNameAsString())) &&
+                                                                (methodMetrics.getParameterCount() ==
+                                                                        callStmt.getArguments().size())
+                                        ).findFirst().ifPresent(
+                                                MethodMetrics::incNumberOfTests
+                                        )
+                        )
+                )
+        );
+
+    }
+
+
+    private static void calcDiff(@NotNull JavaClass javaClass, MethodDeclaration methodDeclaration,
+                                 String methodName) {
+        String newBody = JavaParserUtil.getStringBody(methodDeclaration);
+        String oldBody = javaClass.getMethods().get(methodName);
+        if (!newBody.equals(oldBody)) {
+            int added = 0;
+            int removed = 0;
+            List<String> oldLines = Arrays.asList(oldBody.split("\n"));
+            List<String> newLines = Arrays.asList(newBody.split("\n"));
+            for (String line : newLines) {
+                if (!oldLines.contains(line)) added++;
+            }
+            for (String line : oldLines) {
+                if (!newLines.contains(line)) removed++;
+            }
+            javaClass.getMethodsMetrics().get(methodName).incChanges();
+            javaClass.getMethodsMetrics().get(methodName)
+                    .addChurn(added, removed);
+        }
     }
 
     private void parseJavaClassPerRelease() {
@@ -423,8 +598,8 @@ public class GitInjection {
             for (Commit commit : commitsContainingTicket) {
                 SimpleDateFormat formatter = new SimpleDateFormat(GitInjection.LOCAL_DATE_FORMAT);
                 RevCommit revCommit = commit.getRevCommit();
-                LocalDate commitDate = LocalDate.parse(formatter.format(revCommit.getCommitterIdent()
-                        .getWhenAsInstant()));
+                LocalDate commitDate = LocalDate.parse(formatter.format(
+                        Date.from(revCommit.getCommitterIdent().getWhenAsInstant())));
                 if (!commitDate.isAfter(ticket.getResolutionDate())
                         && !commitDate.isBefore(ticket.getCreationDate())) {
                     List<String> modifiedClassesNames = getTouchedClassesNames(revCommit);
@@ -448,7 +623,7 @@ public class GitInjection {
      */
 
     private void checkForAnyBug(String modifiedClass, Release injectedVersion, Release fixedVersion) {
-        // by marking the class as buggy, this can be removed
+        // by marking the class as a buggy, this can be removed
         for (JavaClass javaClass : this.javaClasses) {
             if (javaClass.getName().equals(modifiedClass)
                     && javaClass.getRelease().getId() < fixedVersion.getId()
@@ -471,8 +646,8 @@ public class GitInjection {
                                                 && jc.getRelease().getId() >= injectedVersion.getId())
                                 .forEach(buggyClass -> buggyClass.getMethods()
                                         .forEach((signature, body) -> {
-                                            BlockStmt fixedBody = fixedVersionClass.getMethods().get(signature);
-                                            // if the method is touched than is marked buggy may be added some other metrics check
+                                            String fixedBody = fixedVersionClass.getMethods().get(signature);
+                                            // if the method is touched, then is marked buggy may be added some other metrics check
                                             if (fixedBody == null || !fixedBody.equals(body)) {
                                                 buggyClass.getMethodsMetrics()
                                                         .get(signature)
@@ -503,7 +678,7 @@ public class GitInjection {
             diffFormatter.setRepository(repository);
             List<DiffEntry> entries = diffFormatter.scan(oldTreeIter, newTreeIter);
             for (DiffEntry entry : entries) {
-                if (entry.getNewPath().contains(".java") && !entry.getNewPath().contains("/test/")) {
+                if (entry.getNewPath().contains(JAVA_EXTENTION) && !entry.getNewPath().contains("/test/")) {
                     touchedClassesNames.add(entry.getNewPath());
                 }
             }
@@ -592,7 +767,7 @@ public class GitInjection {
             inner.put(RELEASE, release.getReleaseName());
             inner.put("creationDate",
                     String.valueOf(LocalDate.parse((new SimpleDateFormat(GitInjection.LOCAL_DATE_FORMAT)
-                            .format(revCommit.getCommitterIdent().getWhenAsInstant())
+                            .format(Date.from(revCommit.getCommitterIdent().getWhenAsInstant()))
                     ))));
             mapCommits.put(revCommit.getName(), inner.toString());
         }

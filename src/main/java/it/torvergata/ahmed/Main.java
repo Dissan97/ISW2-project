@@ -43,7 +43,7 @@ public class Main {
         }
 
 
-        logger.info("Start...");
+        logger.info("____________________________START____________________________");
         long startTime = System.nanoTime();
         ProgramFlow.run(args[0]);
         long endTime = System.nanoTime();

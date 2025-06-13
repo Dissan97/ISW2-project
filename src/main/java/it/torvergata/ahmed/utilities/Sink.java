@@ -2,20 +2,20 @@ package it.torvergata.ahmed.utilities;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import it.torvergata.ahmed.controller.GitInjection;
 import it.torvergata.ahmed.logging.SeLogger;
 import it.torvergata.ahmed.model.ClassifierResult;
 import it.torvergata.ahmed.model.JavaClass;
+import it.torvergata.ahmed.model.MethodHeaders;
 import it.torvergata.ahmed.model.Release;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
 public class Sink {
 
@@ -26,6 +26,7 @@ public class Sink {
             + "datasets" + File.separator;
     private static final String RESULT_PATH = DELIVERY_OUTPUT + File.separator
             + "results" + File.separator;
+    private static final String METHOD = "method";
 
     private static final String CSV_HEADERS_INPUTS = "RELEASE_ID," +
             "FILE_NAME," +
@@ -119,12 +120,61 @@ public class Sink {
 
         }
     }
+    public static void serializeProjectAsCsv(@NotNull GitInjection gitInjection) throws IOException {
+        String dirPath = DATASET_PATH + File.separator + METHOD + File.separator;
+        File directory = new File(dirPath);
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw new IOException("Unable to create directory: " + dirPath);
+        }
 
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(
+                dirPath + gitInjection.getProject().toLowerCase() + ".csv"))) {
+
+            writer.write(MethodHeaders.getCsvHeaders() + "\n");
+
+            gitInjection.getJavaClassPerRelease().keySet().stream().sorted(Comparator.comparing(Release::getId))
+                    .forEach(
+                    release -> gitInjection.getJavaClassPerRelease().get(release).forEach(
+                            javaClass -> {
+                                StringBuilder builder = new StringBuilder();
+                                javaClass.getMethodsMetrics().forEach(
+                                        (s, me) -> builder.append(release.getId()).append(';')
+                                                .append(javaClass.getName()).append(';')
+                                                .append(s).append(';')
+                                                .append(me.getLinesOfCode()).append(';')
+                                                .append(me.getNumberOfChanges()).append(';')
+                                                .append(me.getAvgChurn()).append(';')
+                                                .append(me.getStatementCount()).append(';')
+                                                .append(me.getCyclomaticComplexity()).append(';')
+                                                .append(me.getCognitiveComplexity()).append(';')
+                                                .append(me.getNestingDepth()).append(';')
+                                                .append(me.getParameterCount()).append(';')
+                                                .append(me.getNumberOfTests()).append(';')
+                                                .append(me.getAge()).append(';')
+                                                .append(me.getFanIn()).append(';')
+                                                .append(me.getFanOut()).append(';')
+                                                .append(me.getNumberOfCodeSmells()).append(';')
+                                                .append(me.isBug()).append('\n')
+                                );
+                                try {
+                                    writer.write(builder.toString());
+                                } catch (IOException ignored) {
+                                    throw new IllegalStateException("Something went wrong while writing CSV file");
+                                }
+                            }
+                    ));
+
+
+        }
+    }
+
+    private static final String CLASSES = "classes";
     public static void serializeInjectionToCsv(String projectName, String filename,
                                                List<Release> releases, List<JavaClass> javaClasses,
                                                DataSetType dataSetType) {
 
-        final String datasetPath = DATASET_PATH + projectName + File.separator +
+        final String datasetPath = DATASET_PATH + CLASSES + File.separator + projectName + File.separator +
                 FileExtension.CSV.name().toLowerCase(Locale.getDefault()) + File.separator
                 + dataSetType.toString()
                 .toLowerCase(Locale.getDefault());
@@ -147,9 +197,9 @@ public class Sink {
 
     public static void serializeInjectionToArff(String projectName, String filename,
                                                 List<Release> releases, List<JavaClass> javaClasses,
-                                                DataSetType dataSetType) {
+                                                @NotNull DataSetType dataSetType) {
 
-        final String datasetPath = DATASET_PATH + projectName + File.separator +
+        final String datasetPath = DATASET_PATH + CLASSES + File.separator + projectName + File.separator +
                 FileExtension.ARFF.name().toLowerCase(Locale.getDefault()) + File.separator
                 + dataSetType.toString()
                 .toLowerCase(Locale.getDefault());
@@ -172,7 +222,7 @@ public class Sink {
 
     }
 
-    public static void serializeResultsToCsv(String projectName, List<ClassifierResult> results) {
+    public static void serializeResultsToCsv(@NotNull String projectName, List<ClassifierResult> results) {
 
         final String resultsPath = Sink.RESULT_PATH + projectName + File.separator;
         final String filename = projectName.toLowerCase(Locale.getDefault()) + "_report";

@@ -4,10 +4,9 @@ import com.github.javaparser.Position;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.ast.stmt.BlockStmt;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import it.torvergata.ahmed.utilities.JavaParserUtil;
 import lombok.Getter;
-import org.eclipse.jgit.revwalk.RevCommit;
 
 import java.util.*;
 
@@ -22,12 +21,16 @@ public class JavaClass {
     /**
      * Class body
      */
+
     private final String classBody;
+
+    private String packageName = "";
+    private  String simpleName = "";
     /**
      * Key: Method declaration
      * Value: method String body
      */
-    private final Map<String, BlockStmt> methods;
+    private final Map<String, String> methods;
     /**
      * Key: Method declaration
      * Value: Metrics
@@ -60,23 +63,13 @@ public class JavaClass {
     private final List<Integer> lOCAddedByClass;
     private final List<Integer> lOCRemovedByClass;
 
-    /**
-     * Constructor creates an Entity for JavaClass
-     *
-     * @param name      the class name package/ path/ ClassNam
-     * @param classBody Class body in string format
-     * @param release   the release belongs to this class
-     */
-    public JavaClass(String name, String classBody, RevCommit commit, Release release){
-        this(name, classBody, release, commit, false);
-    }
-    public JavaClass(String name, String classBody, Release release, RevCommit commit, boolean update) {
+    public JavaClass(String name, String classBody, Release release, boolean update) {
         this.name = name;
         this.classBody = classBody;
         this.methods = new HashMap<>();
         this.methodsMetrics = new HashMap<>();
-        this.updateMethodsMap(update, commit);
         this.release = release;
+        this.updateMethodsMap(update);
         metrics = new Metrics();
         classCommits = new ArrayList<>();
         lOCAddedByClass = new ArrayList<>();
@@ -84,37 +77,40 @@ public class JavaClass {
     }
 
     /**
-     * Parse java class and get in string format method declaration and initialize method
+     * Parse java class and get in string format method declaration and initialize a method
      * Metrics map
      *
      * @see Metrics
      */
-    private void updateMethodsMap(boolean update, RevCommit commit) {
+    private void updateMethodsMap(boolean update) {
         CompilationUnit cu = StaticJavaParser.parse(this.classBody);
+        cu.getPackageDeclaration().ifPresent(packageDeclaration ->
+                this.packageName = packageDeclaration.getNameAsString());
+        cu.getTypes().stream()
+                .findFirst()
+                .map(TypeDeclaration::getNameAsString).ifPresent(className ->
+                        this.simpleName = className);
+
         cu.findAll(MethodDeclaration.class).forEach(methodDeclaration -> {
 
             String signature = JavaParserUtil.getSignature(methodDeclaration);
-            methodDeclaration.getBody().ifPresent(
-                    consumer -> {
-                        methods.put(signature, consumer.asBlockStmt());
-                        if (update) {
-                            MethodMetrics methodMetrics = new MethodMetrics();
-                            methodsMetrics.put(signature, methodMetrics);
-                            methodMetrics.addAuthor(commit.getAuthorIdent().getName());
-                            methodMetrics.setParameterCount(JavaParserUtil.computeParameterCount(methodDeclaration));
-                            methodMetrics.setLinesOfCode(JavaParserUtil.computeEffectiveLOC(methodDeclaration));
-                            methodMetrics.setStatementCount(JavaParserUtil.computeStatementCount(methodDeclaration));
-                            methodMetrics.setCyclomaticComplexity(JavaParserUtil.computeCyclomaticComplexity(methodDeclaration));
-                            methodMetrics.setNestingDepth(JavaParserUtil.computeNestingDepth(methodDeclaration));
-                            methodMetrics.setMethodAccessor(methodDeclaration.getAccessSpecifier().asString());
-                            methodMetrics.setBeginLine(methodDeclaration.getBegin().orElse(new Position(0, 0)).line);
-                            methodMetrics.setEndLine(methodDeclaration.getEnd().orElse(new Position(0, 0)).line);
-
-                        }
-                    }
-            );
-
-
+            methods.put(signature, JavaParserUtil.getStringBody(methodDeclaration));
+            if (update) {
+                MethodMetrics methodMetrics = new MethodMetrics();
+                methodsMetrics.put(signature, methodMetrics);
+                methodMetrics.setParameterCount(JavaParserUtil.computeParameterCount(methodDeclaration));
+                methodMetrics.setLinesOfCode(JavaParserUtil.computeEffectiveLOC(methodDeclaration));
+                methodMetrics.setStatementCount(JavaParserUtil.computeStatementCount(methodDeclaration));
+                methodMetrics.setCyclomaticComplexity(JavaParserUtil.computeCyclomaticComplexity(methodDeclaration));
+                methodMetrics.setNestingDepth(JavaParserUtil.computeNestingDepth(methodDeclaration));
+                methodMetrics.setMethodAccessor(methodDeclaration.getAccessSpecifier().asString());
+                methodDeclaration.getBody().ifPresent(body ->
+                        methodMetrics.setCognitiveComplexity(JavaParserUtil.calculateCognitiveComplexity(body)));
+                methodMetrics.setBeginLine(methodDeclaration.getBegin().orElse(new Position(0, 0)).line);
+                methodMetrics.setEndLine(methodDeclaration.getEnd().orElse(new Position(0, 0)).line);
+                methodMetrics.setSimpleName(methodDeclaration.getNameAsString());
+                methodMetrics.setAge(this.release.getId());
+            }
         });
         // we won't check main methods that could be added to do something
         methodsMetrics.keySet().removeIf(key -> key.contains(MAIN_METHOD_SIGNATURE));
@@ -162,5 +158,9 @@ public class JavaClass {
                 ", lOCAddedByClass=" + lOCAddedByClass +
                 ", lOCRemovedByClass=" + lOCRemovedByClass +
                 '}';
+    }
+
+    public String getClassName() {
+        return this.packageName + '.' + this.simpleName;
     }
 }

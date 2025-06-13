@@ -7,6 +7,7 @@ import com.github.javaparser.ast.stmt.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class JavaParserUtil {
 
@@ -110,6 +111,42 @@ public class JavaParserUtil {
     }
 
 
+    public static int calculateCognitiveComplexity(BlockStmt block) {
+        return calculate(block, 0);
+    }
 
+    private static int calculate(Node node, int nesting) {
+        AtomicInteger complexity = new AtomicInteger(0);
+
+        for (Node child : node.getChildNodes()) {
+            if (isNestingStructure(child)) {
+                complexity.incrementAndGet();       // +1 base
+                complexity.addAndGet(nesting);      // + nesting depth
+                complexity.addAndGet(calculate(child, nesting + 1)); // ricorsione
+            } else if (child instanceof BinaryExpr expr) {
+                // Ogni &&/|| dopo il primo aumenta
+                complexity.addAndGet(countLogicalOperators(expr));
+                complexity.addAndGet(calculate(child, nesting)); // continua parsing
+            } else {
+                complexity.addAndGet(calculate(child, nesting));
+            }
+        }
+
+        return complexity.get();
+    }
+
+
+    private static int countLogicalOperators(@NotNull BinaryExpr expr) {
+        int count = 0;
+        if (expr.getOperator() == BinaryExpr.Operator.AND ||
+                expr.getOperator() == BinaryExpr.Operator.OR) {
+            count++;
+            if (expr.getLeft() instanceof BinaryExpr left)
+                count += countLogicalOperators(left);
+            if (expr.getRight() instanceof BinaryExpr right)
+                count += countLogicalOperators(right);
+        }
+        return count;
+    }
 
 }

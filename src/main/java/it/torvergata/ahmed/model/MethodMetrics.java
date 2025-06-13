@@ -6,9 +6,6 @@ import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 
 
-import java.util.HashSet;
-import java.util.Set;
-
 @Getter
 public class MethodMetrics {
 
@@ -18,10 +15,6 @@ public class MethodMetrics {
     @Setter
     private boolean bug = false;
 
-    /**
-     * Number of times the method has been modified across its version history.
-     */
-    private int numOfChanges = 0;
     /**
      * begin line in the class
      */
@@ -33,24 +26,22 @@ public class MethodMetrics {
     @Setter
     private int endLine;
 
-    /**
-     * All authors email Names
-     */
-    private final Set<String> authors = new HashSet<>();
+    @Setter
+    private String simpleName;
 
     /**
-     * Total churn: sum of all lines of code added
+     * Total churn: sum of all lines of code added and deleted in the method over time.
      */
     private int addedChurn = 0;
-    /**
-     *  Total churn: sum of all lines of code deleted in the method over time.
-     */
+
     private int removedChurn = 0;
+
+
 
     /**
      * Number of physical (or non-commented) lines of code in the method.
      */
-    @Setter
+
     private int linesOfCode;
 
     /**
@@ -66,7 +57,7 @@ public class MethodMetrics {
     private int cyclomaticComplexity;
 
     /**
-     * Cognitive complexity: a measure of how difficult the method is to understand based on control flow and nesting.
+     * Cognitive complexity: a measure of how challenging the method is to understand based on control flow and nesting.
      */
     @Setter
     private int cognitiveComplexity;
@@ -84,46 +75,34 @@ public class MethodMetrics {
     private int parameterCount;
 
     /**
-     * Number of code smells detected in the method using static analysis tools.
+     * The Amount of code smells detected in the method using static analysis tools.
      */
     private int numberOfCodeSmells;
+
+    private int numberOfTests = 0;
     @Setter
-    private int numberOfReference;
-
+    private int age = 1;
+    @Setter
+    private int fanIn = 0;
+    @Setter
+    private int fanOut = 0;
     private String methodAccessor;
-    private int numberOfFix = 0;
+    private int numberOfChanges = 0;
 
-
-    public void addAuthor(String author) {
-        authors.add(author);
-    }
-    public void addNumChanges() {
-        this.numOfChanges++;
+    public void addChurn(int addedChurn, int removedChurn) {
+        this.addedChurn += addedChurn;
+        this.removedChurn += removedChurn;
     }
 
-    public void addChurn(int added, int removed) {
-        this.addedChurn += added;
-        this.removedChurn += removed;
+    public void incChanges() {
+        this.numberOfChanges += 1;
     }
 
-    public int getNumOfAuthors() {
-        return this.authors.size();
-    }
-
-    public void incFix() {
-        this.numberOfFix += 1;
-    }
-
-    public void incCodeSmells() {
-        this.numberOfCodeSmells++;
-    }
     @Override
     public String toString() {
         return "MethodMetrics{" +
                 "bug=" + bug +
-                ", numOfChanges=" + numOfChanges +
-                ", authors=" + authors +
-                ", numOfAuthors=" + authors.size() +
+                ", numberOfFix=" + numberOfChanges +
                 ", churn=" + addedChurn +
                 ", linesOfCode=" + linesOfCode +
                 ", statementCount=" + statementCount +
@@ -132,26 +111,9 @@ public class MethodMetrics {
                 ", nestingDepth=" + nestingDepth +
                 ", parameterCount=" + parameterCount +
                 ", numberOfCodeSmells=" + numberOfCodeSmells +
-                ", numberOfReference=" + numberOfReference +
+                ", numberOfReference=" + numberOfTests +
                 ", methodAccessor=" + methodAccessor +
                 '}';
-    }
-
-    public String asCsvString(){
-        return String.valueOf(linesOfCode) + ',' +
-                numOfChanges + ',' +
-                authors.size() + ',' +
-                addedChurn + ',' +
-                statementCount + ',' +
-                cyclomaticComplexity + ',' +
-                cognitiveComplexity + ',' +
-                nestingDepth + ',' +
-                parameterCount + ',' +
-                numberOfCodeSmells + ',' +
-                numberOfReference + ',' +
-                methodAccessor + ',' +
-                bug;
-
     }
 
 
@@ -163,7 +125,20 @@ public class MethodMetrics {
         }
         this.methodAccessor = accessor;
     }
+    public void setLinesOfCode(int linesOfCode) {
+        this.linesOfCode = linesOfCode > 0 ?  linesOfCode : 1 ;
+    }
 
-
-
+    public void incNumberOfTests(){
+        this.numberOfTests += 1;
+    }
+    public void incCodeSmells() {
+        this.numberOfCodeSmells++;
+    }
+    public void incAge() {
+        this.age += 1;
+    }
+    public int getAvgChurn() {
+        return this.numberOfChanges > 0 ? this.addedChurn + this.removedChurn / this.numberOfChanges : 0;
+    }
 }
