@@ -1,6 +1,7 @@
 package it.torvergata.ahmed.controller;
 
 
+import it.torvergata.ahmed.logging.SeLogger;
 import it.torvergata.ahmed.model.Release;
 import it.torvergata.ahmed.model.Ticket;
 import it.torvergata.ahmed.utilities.Sink;
@@ -61,7 +62,6 @@ public class JiraInjection {
     public void injectTickets() throws IOException, URISyntaxException {
         this.pullIssues();
         this.filterFixedApplyingProportion();
-
     }
 
     public void filterFixedNormally() {
@@ -83,6 +83,8 @@ public class JiraInjection {
         int i = 0;
         int total;
         this.ticketsWithIssues = new ArrayList<>();
+        int tickets = 0;
+        int ticketWithIssue = 0;
         do {
             j = i + 1000;
             String url = "https://issues.apache.org/jira/rest/api/2/search?jql=project=%22"
@@ -95,6 +97,7 @@ public class JiraInjection {
             total = json.getInt("total");
             for (; i < total && i < j; i++) {
                 //Iterate through each bug
+                tickets++;
                 String key = issues.getJSONObject(i%1000).get("key").toString();
                 JSONObject fields = issues.getJSONObject(i%1000).getJSONObject("fields");
                 String creationDateString = fields.get("created").toString();
@@ -117,10 +120,13 @@ public class JiraInjection {
                     this.ticketsWithIssues.add(new Ticket(key, creationDate, resolutionDate, openingVersion,
                             fixedVersion, this.affectedReleases));
                 }
+                ticketWithIssue++;
             }
         } while (i < total);
         this.ticketsWithIssues.sort(Comparator.comparing(Ticket::getResolutionDate));
-
+        String msg = String.format("project=%s, ticket=%d, ticketWithAffectedVersion=%d", projName,
+                tickets, ticketWithIssue);
+        SeLogger.getInstance().getLogger().info(msg);
     }
 
     private void filterFixedApplyingProportion() {

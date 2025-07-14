@@ -2,11 +2,18 @@ package it.torvergata.ahmed.utilities;
 
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.comments.Comment;
 import com.github.javaparser.ast.expr.BinaryExpr;
+import com.github.javaparser.ast.expr.MethodCallExpr;
+import com.github.javaparser.ast.expr.NameExpr;
+import com.github.javaparser.ast.expr.UnaryExpr;
 import com.github.javaparser.ast.stmt.*;
+import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class JavaParserUtil {
@@ -48,27 +55,22 @@ public class JavaParserUtil {
         return complexity;
     }
 
+    public static @NotNull String normalizeMethod(String method) {
+        if (method == null) {
+            return "";
+        }
+        method = method.replaceAll(SINGLE_LINE_COMMENTS, "");
+        method = method.replaceAll(MULTILINE_COMMENTS, "");
+        method = method.replaceAll("\\s+", " ").trim();
+        return method;
+    }
+
+
     public static int computeStatementCount(@NotNull MethodDeclaration method) {
         return method.getBody()
                 .map(body -> body.getStatements().size())
                 .orElse(0);
     }
-
-    public static int computeEffectiveLOC(@NotNull MethodDeclaration method) {
-        return method.getBody()
-                .map(body -> {
-                    String code = body.toString()
-                            .replaceAll(MULTILINE_COMMENTS, "") // rimuove /* ... */
-                            .replaceAll(SINGLE_LINE_COMMENTS, "");           // rimuove // ...
-                    return Math.toIntExact(Arrays.stream(code.split("\n"))
-                            .map(String::trim)
-                            .filter(line -> !line.isEmpty() && !line.equals("{") && !line.equals("}"))
-                            .count()
-                    );
-                })
-                .orElse(0);
-    }
-
     public static int computeParameterCount(@NotNull MethodDeclaration method) {
         return method.getParameters().size();
     }
@@ -136,6 +138,8 @@ public class JavaParserUtil {
     }
 
 
+
+
     private static int countLogicalOperators(@NotNull BinaryExpr expr) {
         int count = 0;
         if (expr.getOperator() == BinaryExpr.Operator.AND ||
@@ -149,4 +153,143 @@ public class JavaParserUtil {
         return count;
     }
 
+
+    public static double computeHalsteadEffort(MethodDeclaration md) {
+
+        HalsteadCounter visitor = new HalsteadCounter();
+        visitor.visit(md, null);
+        int n1 = visitor.getUniqueOperators();
+        int n2 = visitor.getUniqueOperands();
+        int totalOperators = visitor.getTotalOperators();
+        int totalOperands = visitor.getTotalOperands();
+
+        if (n1 == 0 || n2 == 0) {
+            return 0.0;
+        }
+        double vocabulary = (double) n1 + n2;
+        double length     = (double) totalOperators + totalOperands;
+        if (vocabulary <= 0.0 || length <= 0.0) {
+            return 0.0;
+        }
+
+        double volume     = length * (Math.log(vocabulary) / Math.log(2));
+        double difficulty = (n1 / 2.0) * (totalOperands / (double) n2);
+
+        double effort = difficulty * volume;
+        if (Double.isFinite(effort)) {
+            return effort;
+        } else {
+            return 0.0;
+        }
+    }
+
+    public static int computeLOC(MethodDeclaration methodDeclaration) {
+
+        AtomicInteger ret = new AtomicInteger(0);
+        methodDeclaration.getRange().ifPresent(
+                range -> {
+                    ret.set(range.end.line - range.begin.line + 1);
+                    methodDeclaration.getBody().ifPresent(
+                            body -> {
+                                int totalLines = range.end.line - range.begin.line + 1;
+                                int startLine  = range.begin.line;
+                                String[] lines = getStringBody(methodDeclaration).split("\n");
+                                Set<Integer> commentLines = new HashSet<>();
+                                for (Comment comment : methodDeclaration.getAllContainedComments())
+                                    comment.getRange().ifPresent(cRange -> {
+                                        for (int l = cRange.begin.line; l <= cRange.end.line; l++) {
+                                            commentLines.add(l);
+                                        }
+                                    });
+                                int toSubtract = getToSubtract(lines, startLine, commentLines);
+
+                                ret.set(totalLines - toSubtract);
+                            }
+                    );
+                }
+        );
+
+        return ret.get();
+    }
+
+    private static int getToSubtract(String[] lines, int startLine, Set<Integer> commentLines) {
+        int toSubtract = 0;
+
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i].trim();
+            int absoluteLine = startLine + i;
+
+            // righe vuote, solo parentesi, o commentate → sottrai
+            if (line.isEmpty()
+                    || line.equals("{")
+                    || line.equals("}")
+                    || commentLines.contains(absoluteLine)) {
+                toSubtract++;
+            }
+        }
+        return toSubtract;
+    }
+
+
+    // Visitor che conta operatori/operandi
+    private static class HalsteadCounter extends VoidVisitorAdapter<Void> {
+        private final Set<String> uniqueOps = new HashSet<>();
+        private final Set<String> uniqueOprs = new HashSet<>();
+        private int totalOps = 0;
+        private int totalOprs = 0;
+
+        @Override
+        public void visit(BinaryExpr n, Void arg) {
+            String op = n.getOperator().asString();
+            uniqueOps.add(op);
+            totalOps++;
+            super.visit(n, arg);
+        }
+        @Override
+        public void visit(UnaryExpr n, Void arg) {
+            uniqueOps.add(n.getOperator().asString());
+            totalOps++;
+            super.visit(n, arg);
+        }
+        @Override
+        public void visit(MethodCallExpr n, Void arg) {
+            uniqueOps.add("call");
+            totalOps++;
+            // il nome del metodo come operando
+            uniqueOprs.add(n.getNameAsString());
+            totalOprs++;
+            super.visit(n, arg);
+        }
+        @Override
+        public void visit(NameExpr n, Void arg) {
+            uniqueOprs.add(String.valueOf(n.getName()));
+            totalOprs++;
+            super.visit(n, arg);
+        }
+
+
+        int getUniqueOperators() { return uniqueOps.size(); }
+        int getUniqueOperands()  { return uniqueOprs.size(); }
+        int getTotalOperators()  { return totalOps; }
+        int getTotalOperands()   { return totalOprs; }
+    }
+
+    public static double computeCommentDensity(MethodDeclaration md) {
+        // 1. count totale righe del metodo
+        int begin = md.getBegin().map(p -> p.line).orElse(0);
+        int end   = md.getEnd  ().map(p -> p.line).orElse(begin);
+        int totalLines = end - begin + 1;
+        if (totalLines <= 0) return 0;
+
+        // 2. conta commenti contenuti
+        List<Comment> comments = md.getAllContainedComments();
+        // ciascun comment ha un range di righe:
+        int commentLines = 0;
+        for (Comment c : comments) {
+            int cb = c.getBegin().map(p -> p.line).orElse(0);
+            int ce = c.getEnd  ().map(p -> p.line).orElse(cb);
+            commentLines += (ce - cb + 1);
+        }
+        return commentLines / (double) totalLines;
+    }
 }

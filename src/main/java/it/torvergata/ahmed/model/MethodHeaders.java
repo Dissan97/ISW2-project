@@ -7,17 +7,20 @@ public enum MethodHeaders {
     CLASS_NAME,
     METHOD_SIGNATURE,
     LINES_OF_CODE,
-    NUMBER_OF_CHANGES,
-    AVG_CHURN,
     STATEMENT_COUNT,
+    NUMBER_OF_AUTHORS,
+    ADDED_CHURN,
+    REMOVED_CHURN,
+    MAX_ADDED_CHURN,
+    MAX_REMOVED_CHURN,
     CYCLOMATIC_COMPLEXITY,
     COGNITIVE_COMPLEXITY,
-    NESTING_DEPTH,
     PARAMETER_COUNT,
-    NUM_OF_TESTS,
     AGE_RELATIVE_THIS_RELEASE,
     FAN_IN,
     FAN_OUT,
+    HALSTEAD_EFFORT,
+    COMMENT_DENSITY,
     NUMBER_OF_CODE_SMELLS,
     BUG;
 
@@ -30,5 +33,6 @@ public enum MethodHeaders {
         sb.deleteCharAt(sb.length()-1);
         return sb.toString();
     }
+
 
 }

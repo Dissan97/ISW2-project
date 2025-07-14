@@ -140,7 +140,9 @@ public class Pipeline implements Runnable{
             logger.info(info);
 
         } catch (Exception e) {
-            logger.severe("error: " + e.getMessage());
+            String msg = String.format("Error in pipeline %s: [%s] %s", this.targetName, e.getClass().getSimpleName(),
+                    e.getMessage());
+            logger.severe(msg);
         } finally {
             long overallEnd = System.nanoTime();
             info = getPipeMsg("total processing took: " + getTimeInSeconds(overallStart, overallEnd) +

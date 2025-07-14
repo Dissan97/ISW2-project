@@ -4,10 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import it.torvergata.ahmed.controller.GitInjection;
 import it.torvergata.ahmed.logging.SeLogger;
-import it.torvergata.ahmed.model.ClassifierResult;
-import it.torvergata.ahmed.model.JavaClass;
-import it.torvergata.ahmed.model.MethodHeaders;
-import it.torvergata.ahmed.model.Release;
+import it.torvergata.ahmed.model.*;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
@@ -102,6 +99,30 @@ public class Sink {
         }
     }
 
+
+
+    public static void storeMaxCodeSmells(String name,
+                                          JavaClass jc, Map.Entry<String, MethodMetrics> entry) throws IOException {
+        String dirPath = DATASET_PATH + File.separator + METHOD + File.separator +"codeSmell"+ File.separator;
+        File directory = new File(dirPath);
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw new IOException("Unable to create directory: " + dirPath);
+        }
+
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(
+                dirPath  +name))) {
+            writer.write(jc.getClassBody());
+            writer.flush();
+        }
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(
+                dirPath +name+"-methods.txt"))) {
+            writer.write("name="+entry.getKey() + ", isBug="+entry.getValue().isBug());
+            writer.flush();
+        }
+    }
+
     public enum FileExtension {
         JSON,
         ARFF, CSV
@@ -139,23 +160,26 @@ public class Sink {
                             javaClass -> {
                                 StringBuilder builder = new StringBuilder();
                                 javaClass.getMethodsMetrics().forEach(
-                                        (s, me) -> builder.append(release.getId()).append(';')
+                                        (methodSignature, methodMetric) -> builder.append(release.getId()).append(';')
                                                 .append(javaClass.getName()).append(';')
-                                                .append(s).append(';')
-                                                .append(me.getLinesOfCode()).append(';')
-                                                .append(me.getNumberOfChanges()).append(';')
-                                                .append(me.getAvgChurn()).append(';')
-                                                .append(me.getStatementCount()).append(';')
-                                                .append(me.getCyclomaticComplexity()).append(';')
-                                                .append(me.getCognitiveComplexity()).append(';')
-                                                .append(me.getNestingDepth()).append(';')
-                                                .append(me.getParameterCount()).append(';')
-                                                .append(me.getNumberOfTests()).append(';')
-                                                .append(me.getAge()).append(';')
-                                                .append(me.getFanIn()).append(';')
-                                                .append(me.getFanOut()).append(';')
-                                                .append(me.getNumberOfCodeSmells()).append(';')
-                                                .append(me.isBug()).append('\n')
+                                                .append(methodSignature).append(';')
+                                                .append(methodMetric.getLinesOfCode()).append(';')
+                                                .append(methodMetric.getStatementCount()).append(';')
+                                                .append(methodMetric.getAuthorCount()).append(';')
+                                                .append(methodMetric.getAddedChurn()).append(';')
+                                                .append(methodMetric.getRemovedChurn()).append(';')
+                                                .append(methodMetric.getMaxAddedChurn()).append(';')
+                                                .append(methodMetric.getMaxRemovedChurn()).append(';')
+                                                .append(methodMetric.getCyclomaticComplexity()).append(';')
+                                                .append(methodMetric.getCognitiveComplexity()).append(';')
+                                                .append(methodMetric.getParameterCount()).append(';')
+                                                .append(methodMetric.getAge()).append(';')
+                                                .append(methodMetric.getFanIn()).append(';')
+                                                .append(methodMetric.getFanOut()).append(';')
+                                                .append(methodMetric.getHalsteadEffort()).append(';')
+                                                .append(methodMetric.getCommentDensity()).append(';')
+                                                .append(methodMetric.getNumberOfCodeSmells()).append(';')
+                                                .append(methodMetric.isBug()).append('\n')
                                 );
                                 try {
                                     writer.write(builder.toString());

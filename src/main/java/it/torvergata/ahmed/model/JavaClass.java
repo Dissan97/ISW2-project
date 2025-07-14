@@ -1,10 +1,12 @@
 package it.torvergata.ahmed.model;
 
+import com.github.javaparser.ParseProblemException;
 import com.github.javaparser.Position;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
+import it.torvergata.ahmed.logging.SeLogger;
 import it.torvergata.ahmed.utilities.JavaParserUtil;
 import lombok.Getter;
 
@@ -12,7 +14,6 @@ import java.util.*;
 
 @Getter
 public class JavaClass {
-    private static final String MAIN_METHOD_SIGNATURE = " public static void main(String[] args)";
 
     /**
      * the class name package/path/ClassName
@@ -25,7 +26,7 @@ public class JavaClass {
     private final String classBody;
 
     private String packageName = "";
-    private  String simpleName = "";
+    private String simpleName = "";
     /**
      * Key: Method declaration
      * Value: method String body
@@ -58,10 +59,11 @@ public class JavaClass {
     private final List<Commit> classCommits;
     /**
      * -- GETTER --
-     *  Return the Lines of code added in the commit
+     * Return the Lines of code added in the commit
      */
     private final List<Integer> lOCAddedByClass;
     private final List<Integer> lOCRemovedByClass;
+    private boolean hasMap = true;
 
     public JavaClass(String name, String classBody, Release release, boolean update) {
         this.name = name;
@@ -70,10 +72,17 @@ public class JavaClass {
         this.methodsMetrics = new HashMap<>();
         this.release = release;
         this.updateMethodsMap(update);
+        this.validateMethods();
         metrics = new Metrics();
         classCommits = new ArrayList<>();
         lOCAddedByClass = new ArrayList<>();
         lOCRemovedByClass = new ArrayList<>();
+    }
+
+    private void validateMethods() {
+        methodsMetrics.entrySet().removeIf(entry ->
+                entry.getValue().getBeginLine() == 0 || entry.getValue().getEndLine() == 0
+        );
     }
 
     /**
@@ -83,7 +92,15 @@ public class JavaClass {
      * @see Metrics
      */
     private void updateMethodsMap(boolean update) {
-        CompilationUnit cu = StaticJavaParser.parse(this.classBody);
+        CompilationUnit cu;
+        try {
+            cu = StaticJavaParser.parse(this.classBody);
+        }catch (ParseProblemException e){
+            SeLogger.getInstance().getLogger().warning(e.getClass().getSimpleName()+" exception for class="
+                    +this.name + "message: " + e.getMessage());
+            hasMap = false;
+            return;
+        }
         cu.getPackageDeclaration().ifPresent(packageDeclaration ->
                 this.packageName = packageDeclaration.getNameAsString());
         cu.getTypes().stream()
@@ -94,27 +111,34 @@ public class JavaClass {
         cu.findAll(MethodDeclaration.class).forEach(methodDeclaration -> {
 
             String signature = JavaParserUtil.getSignature(methodDeclaration);
-            methods.put(signature, JavaParserUtil.getStringBody(methodDeclaration));
-            if (update) {
-                MethodMetrics methodMetrics = new MethodMetrics();
-                methodsMetrics.put(signature, methodMetrics);
-                methodMetrics.setParameterCount(JavaParserUtil.computeParameterCount(methodDeclaration));
-                methodMetrics.setLinesOfCode(JavaParserUtil.computeEffectiveLOC(methodDeclaration));
-                methodMetrics.setStatementCount(JavaParserUtil.computeStatementCount(methodDeclaration));
-                methodMetrics.setCyclomaticComplexity(JavaParserUtil.computeCyclomaticComplexity(methodDeclaration));
-                methodMetrics.setNestingDepth(JavaParserUtil.computeNestingDepth(methodDeclaration));
-                methodMetrics.setMethodAccessor(methodDeclaration.getAccessSpecifier().asString());
-                methodDeclaration.getBody().ifPresent(body ->
-                        methodMetrics.setCognitiveComplexity(JavaParserUtil.calculateCognitiveComplexity(body)));
-                methodMetrics.setBeginLine(methodDeclaration.getBegin().orElse(new Position(0, 0)).line);
-                methodMetrics.setEndLine(methodDeclaration.getEnd().orElse(new Position(0, 0)).line);
-                methodMetrics.setSimpleName(methodDeclaration.getNameAsString());
-                methodMetrics.setAge(this.release.getId());
-            }
+
+                methods.put(signature, JavaParserUtil.getStringBody(methodDeclaration));
+                if (update) {
+                    MethodMetrics methodMetrics = new MethodMetrics();
+                    methodsMetrics.put(signature, methodMetrics);
+                    methodMetrics.setParameterCount(JavaParserUtil.computeParameterCount(methodDeclaration));
+                    methodMetrics.setLinesOfCode(JavaParserUtil.computeLOC(methodDeclaration));
+                    methodMetrics.setStatementCount(JavaParserUtil.computeStatementCount(methodDeclaration));
+                    methodMetrics.setCyclomaticComplexity(
+                            JavaParserUtil.computeCyclomaticComplexity(methodDeclaration));
+                    methodMetrics.setNestingDepth(JavaParserUtil.computeNestingDepth(methodDeclaration));
+                    methodMetrics.setMethodAccessor(methodDeclaration.getAccessSpecifier().asString());
+                    methodDeclaration.getBody().ifPresent(body ->
+                            methodMetrics.setCognitiveComplexity(JavaParserUtil.calculateCognitiveComplexity(body)));
+                    methodMetrics.setBeginLine(methodDeclaration.getBegin()
+                            .orElse(new Position(0, 0)).line);
+                    methodMetrics.setEndLine(methodDeclaration.getEnd()
+                            .orElse(new Position(0, 0)).line);
+                    methodMetrics.setSimpleName(methodDeclaration.getNameAsString());
+                    methodMetrics.setAge(this.release.getId());
+                    methodMetrics.setHalsteadEffort(
+                            JavaParserUtil.computeHalsteadEffort(methodDeclaration));
+                    methodMetrics.setCommentDensity(
+                            JavaParserUtil.computeCommentDensity(methodDeclaration));
+                }
+
         });
-        // we won't check main methods that could be added to do something
-        methodsMetrics.keySet().removeIf(key -> key.contains(MAIN_METHOD_SIGNATURE));
-        methods.keySet().removeIf(key -> key.contains(MAIN_METHOD_SIGNATURE));
+
     }
 
 
@@ -144,7 +168,6 @@ public class JavaClass {
     public void addLOCRemovedByClass(Integer lOCRemovedByEntry) {
         lOCRemovedByClass.add(lOCRemovedByEntry);
     }
-
 
 
     @Override
