@@ -11,22 +11,8 @@ The collected data supports training of machine learning models to identify bugg
 * Associates Git commits to JIRA tickets
 * Annotates methods as buggy or clean based on ticket resolution
 * Compute Features:
-
-    * `LINES_OF_CODE`
-    * `NUMBER_OF_CHANGES`
-    * `AVG_CHURN`
-    * `STATEMENT_COUNT`
-    * `CYCLOMATIC_COMPLEXITY`
-    * `COGNITIVE_COMPLEXITY`
-    * `NESTING_DEPTH`
-    * `PARAMETER_COUNT`
-    * `NUM_OF_TESTS`
-    * `AGE_RELATIVE_THIS_RELEASE`
-    * `FAN_IN`
-    * `FAN_OUT`
-    * `NUMBER_OF_CODE_SMELLS`
 * Parses PMD code smells for each release
-* Create a dataset for each project
+
 * ML for evaluation
 
 ## Architecture
